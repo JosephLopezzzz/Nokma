@@ -1,0 +1,269 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, TouchableOpacity, Text, Animated, Dimensions, Modal, ScrollView } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, Rect, Mask, LinearGradient, Stop } from 'react-native-svg';
+import { Spacing, Radius } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
+import { scanNutritionFactsProgressive, ProgressiveNutritionData, createEmptyNutritionData } from '../services/nutritionScanner';
+
+interface ScannerCameraProps {
+  visible: boolean;
+  onCapture: (data: ProgressiveNutritionData) => void;
+  onClose: () => void;
+}
+
+const { width, height } = Dimensions.get('window');
+const SCANNER_SIZE = width * 0.75;
+const SCANNER_RADIUS = 32;
+
+export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCameraProps) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [scannedData, setScannedData] = useState<ProgressiveNutritionData | null>(null);
+  const cameraRef = useRef<CameraView>(null);
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  
+  // Laser animation goes from -100 (above) to SCANNER_SIZE
+  const laserAnim = useRef(new Animated.Value(-100)).current;
+
+  useEffect(() => {
+    if (visible && permission?.granted && !isProcessing) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(laserAnim, {
+            toValue: SCANNER_SIZE,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(laserAnim, {
+            toValue: -100,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      laserAnim.stopAnimation();
+      laserAnim.setValue(-100);
+    }
+  }, [visible, permission, isProcessing]);
+
+  if (!visible) return null;
+
+  if (!permission) {
+    return <Modal visible={visible} transparent={false}><View style={styles.container} /></Modal>;
+  }
+
+  if (!permission.granted) {
+    return (
+      <Modal visible={visible} animationType="slide" transparent={false}>
+        <View style={[styles.container, { backgroundColor: colors.bg, padding: Spacing.xl, justifyContent: 'center' }]}>
+          <Text style={[styles.message, { color: colors.textPrimary }]}>We need your permission to show the camera</Text>
+          <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary }]} onPress={requestPermission}>
+            <Text style={styles.btnText}>Grant Permission</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.closeBtn, { marginTop: Spacing.lg }]} onPress={onClose}>
+            <Text style={{ color: colors.textSecondary }}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    );
+  }
+
+  const takePicture = async () => {
+    if (cameraRef.current && !isProcessing) {
+      setIsProcessing(true);
+      setScannedData(createEmptyNutritionData());
+      try {
+        // We freeze the camera while analyzing by taking the picture, then waiting for AI.
+        // Actually, expo-camera will keep previewing unless we pause it, but that's fine.
+        const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
+        if (photo?.base64) {
+          const finalData = await scanNutritionFactsProgressive(photo.base64, (partialData) => {
+            setScannedData({ ...partialData });
+          });
+          // Small delay for user to read the final screen before dismissing
+          setTimeout(() => {
+            setIsProcessing(false);
+            setScannedData(null);
+            onCapture(finalData);
+          }, 1200);
+        } else {
+          setIsProcessing(false);
+          setScannedData(null);
+        }
+      } catch (err) {
+        console.error('Camera error:', err);
+        setIsProcessing(false);
+        setScannedData(null);
+      }
+    }
+  };
+
+  const renderProgressiveFields = () => {
+    if (!scannedData) return null;
+    
+    const fields = [
+      { key: 'calories', label: 'Calories', data: scannedData.nutrition.calories },
+      { key: 'total_fat', label: 'Total Fat', data: scannedData.nutrition.total_fat },
+      { key: 'saturated_fat', label: 'Saturated Fat', data: scannedData.nutrition.saturated_fat },
+      { key: 'total_carbohydrates', label: 'Carbs', data: scannedData.nutrition.total_carbohydrates },
+      { key: 'dietary_fiber', label: 'Fiber', data: scannedData.nutrition.dietary_fiber },
+      { key: 'total_sugars', label: 'Sugars', data: scannedData.nutrition.total_sugars },
+      { key: 'protein', label: 'Protein', data: scannedData.nutrition.protein },
+      { key: 'sodium', label: 'Sodium', data: scannedData.nutrition.sodium },
+    ];
+
+    return (
+      <View style={styles.progressiveContainer}>
+        <Text style={styles.progressiveTitle}>Scanning Nutrition...</Text>
+        <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+          {fields.map(f => (
+            <View key={f.key} style={styles.progressiveRow}>
+              <Text style={styles.progressiveLabel}>{f.label}</Text>
+              {f.data.value !== null ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={styles.progressiveValue}>{f.data.value} {f.data.unit}</Text>
+                  <Ionicons name="checkmark-circle" size={16} color="#4cd964" style={{ marginLeft: 6 }} />
+                </View>
+              ) : (
+                <Text style={styles.progressiveScanning}>Scanning...</Text>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={false}>
+      <View style={styles.container}>
+        <CameraView style={styles.camera} ref={cameraRef} facing="back">
+          
+          {/* True Cutout Overlay using SVG Mask */}
+          <Svg style={StyleSheet.absoluteFill}>
+            <Defs>
+              <Mask id="mask">
+                <Rect x={0} y={0} width="100%" height="100%" fill="white" />
+                <Rect 
+                  x={(width - SCANNER_SIZE) / 2} 
+                  y={(height - SCANNER_SIZE) / 2 - 40} 
+                  width={SCANNER_SIZE} 
+                  height={SCANNER_SIZE} 
+                  rx={SCANNER_RADIUS} 
+                  fill="black" 
+                />
+              </Mask>
+            </Defs>
+            <Rect x={0} y={0} width="100%" height="100%" fill="rgba(0,0,0,0.7)" mask="url(#mask)" />
+          </Svg>
+
+          <View style={styles.uiLayer}>
+            {/* Top Bar */}
+            <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+              <TouchableOpacity onPress={onClose} style={styles.iconBtn} disabled={isProcessing}>
+                <Ionicons name="close" size={28} color="white" />
+              </TouchableOpacity>
+              <View style={styles.headerTitleContainer}>
+                <Text style={styles.headerTitle}>AI Scanner</Text>
+                <Text style={styles.headerSubtitle}>Scan Nutrition Facts</Text>
+              </View>
+              <View style={{ width: 28 }} />
+            </View>
+
+            {/* Scanner Box Area (absolutely positioned to match SVG hole) */}
+            <View style={styles.scannerArea}>
+              <View style={styles.scannerBox}>
+                {/* Corner Brackets */}
+                <View style={[styles.corner, styles.topLeft]} />
+                <View style={[styles.corner, styles.topRight]} />
+                <View style={[styles.corner, styles.bottomLeft]} />
+                <View style={[styles.corner, styles.bottomRight]} />
+                
+                {/* Laser Animation */}
+                {!isProcessing && (
+                  <Animated.View
+                    style={[
+                      styles.laserContainer,
+                      { transform: [{ translateY: laserAnim }] },
+                    ]}
+                  >
+                    <Svg width="100%" height="100%">
+                      <Defs>
+                        <LinearGradient id="laserGrad" x1="0" y1="0" x2="0" y2="1">
+                          <Stop offset="0" stopColor={colors.primary} stopOpacity="0" />
+                          <Stop offset="0.9" stopColor={colors.primary} stopOpacity="0.4" />
+                          <Stop offset="1" stopColor={colors.primary} stopOpacity="1" />
+                        </LinearGradient>
+                      </Defs>
+                      <Rect width="100%" height="100%" fill="url(#laserGrad)" />
+                    </Svg>
+                  </Animated.View>
+                )}
+              </View>
+            </View>
+
+            {/* Bottom Bar / Progressive UI */}
+            <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.xl }]}>
+              {isProcessing ? (
+                renderProgressiveFields()
+              ) : (
+                <TouchableOpacity 
+                  style={styles.captureBtn} 
+                  onPress={takePicture}
+                >
+                  <View style={styles.captureBtnInner}>
+                    <View style={[styles.captureBtnCore, { backgroundColor: colors.primary }]} />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </CameraView>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000' },
+  camera: { flex: 1 },
+  uiLayer: { flex: 1, justifyContent: 'space-between' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg },
+  iconBtn: { padding: Spacing.xs },
+  headerTitleContainer: { alignItems: 'center' },
+  headerTitle: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+  headerSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 2 },
+  scannerArea: {
+    position: 'absolute',
+    left: (width - SCANNER_SIZE) / 2,
+    top: (height - SCANNER_SIZE) / 2 - 40,
+    width: SCANNER_SIZE,
+    height: SCANNER_SIZE,
+  },
+  scannerBox: { width: '100%', height: '100%', borderRadius: SCANNER_RADIUS, overflow: 'hidden' },
+  corner: { position: 'absolute', width: 40, height: 40, borderColor: 'white' },
+  topLeft: { top: -2, left: -2, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: SCANNER_RADIUS },
+  topRight: { top: -2, right: -2, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: SCANNER_RADIUS },
+  bottomLeft: { bottom: -2, left: -2, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: SCANNER_RADIUS },
+  bottomRight: { bottom: -2, right: -2, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: SCANNER_RADIUS },
+  laserContainer: { position: 'absolute', left: 0, right: 0, height: 100 },
+  footer: { alignItems: 'center', paddingTop: Spacing.xl, paddingHorizontal: Spacing.lg },
+  captureBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center' },
+  captureBtnInner: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
+  captureBtnCore: { width: 54, height: 54, borderRadius: 27 },
+  message: { textAlign: 'center', paddingBottom: 10, fontSize: 16 },
+  btn: { padding: Spacing.md, borderRadius: Radius.md, alignItems: 'center' },
+  btnText: { color: 'white', fontWeight: 'bold' },
+  closeBtn: { alignItems: 'center', padding: Spacing.sm },
+  progressiveContainer: { width: '100%', backgroundColor: 'rgba(20,20,20,0.85)', borderRadius: Radius.lg, padding: Spacing.lg },
+  progressiveTitle: { color: 'white', fontSize: 16, fontWeight: 'bold', marginBottom: Spacing.md, textAlign: 'center' },
+  progressiveRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.1)' },
+  progressiveLabel: { color: '#ccc', fontSize: 14 },
+  progressiveValue: { color: 'white', fontSize: 14, fontWeight: 'bold' },
+  progressiveScanning: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontStyle: 'italic' },
+});

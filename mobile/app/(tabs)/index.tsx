@@ -100,7 +100,7 @@ function CalorieRing({
 
 
 export default function DashboardScreen() {
-  const { user } = useAuth();
+  const { user, dailySteps } = useAuth();
   const { lang, t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
@@ -303,6 +303,17 @@ export default function DashboardScreen() {
                     </View>
                   );
                 })}
+              </View>
+            )}
+
+            {/* Steps KPI */}
+            {dailySteps > 0 && (
+              <View style={styles.stepsCard}>
+                <Ionicons name="footsteps" size={20} color={colors.primary} />
+                <Text style={styles.stepsText}>
+                  {dailySteps.toLocaleString()}{' '}
+                  <Text style={styles.stepsLabel}>{t('dash.steps') || 'Steps'}</Text>
+                </Text>
               </View>
             )}
 
@@ -561,6 +572,30 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.calories,
     fontWeight: FontWeight.semibold,
     marginTop: 2,
+  },
+  stepsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(232,162,84,0.1)',
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(232,162,84,0.3)',
+    marginBottom: Spacing.md,
+    gap: 8,
+  },
+  stepsText: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+    color: colors.textPrimary,
+  },
+  stepsLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+    color: colors.textSecondary,
   },
 
   macroTrio: {

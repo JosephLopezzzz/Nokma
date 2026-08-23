@@ -13,6 +13,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isOnboarded: boolean;
+  dailySteps: number;
   completeOnboarding: (userData: Partial<User>) => Promise<void>;
   updateUser: (updated: Partial<User>) => Promise<void>;
   resetUser: () => Promise<void>;
@@ -105,11 +106,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const [dailySteps, setDailySteps] = useState(0);
+
+  // ─── Foreground Health Sync ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    
+    // Lazy import to prevent issues on non-supported platforms
+    const { getHealthSyncConfig, readHealthData } = require('../services/healthSyncService');
+
+    const performSync = async () => {
+      try {
+        const config = await getHealthSyncConfig();
+        if (!config.enabled || !config.permissionsGranted) return;
+
+        const data = await readHealthData();
+        setDailySteps(data.steps || 0);
+        
+        // Auto-update weight if it differs by more than 0.1kg
+        if (data.weight && Math.abs(data.weight - (user.weight_kg || 0)) > 0.1) {
+          updateUser({ weight_kg: data.weight });
+        }
+      } catch (e) {
+        console.error('Foreground health sync failed:', e);
+      }
+    };
+
+    // Sync immediately
+    performSync();
+
+    // And sync every time the app comes to foreground
+    const sub = Platform.OS === 'web' ? { remove: () => {} } : require('react-native').AppState.addEventListener('change', (nextAppState: any) => {
+      if (nextAppState === 'active') {
+        performSync();
+      }
+    });
+
+    return () => sub.remove();
+  }, [user?.id]); // Only rebind if user changes, use user.id to prevent infinite loops from weight updates
+
   return (
     <AuthContext.Provider value={{
       user,
       isLoading,
       isOnboarded: !!user,
+      dailySteps,
       completeOnboarding,
       updateUser,
       resetUser,

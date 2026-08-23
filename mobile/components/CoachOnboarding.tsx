@@ -19,7 +19,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import CoachBubble from './CoachBubble';
+import CoachBubble, { CoachBubbleHandle } from './CoachBubble';
 import SearchableSelectList from './SearchableSelectList';
 import {
   getWelcomeMessage,
@@ -65,6 +65,7 @@ const STEPS = [
   'language',
   'welcome',
   'age',
+  'sex',
   'height_weight',
   'feedback',
   'goal',
@@ -76,6 +77,7 @@ const STEPS = [
 interface FormData {
   name: string;
   age: string;
+  sex: 'male' | 'female' | '';
   heightValue: string;
   weightValue: string;
   heightUnit: 'cm' | 'in';
@@ -93,6 +95,7 @@ interface FormData {
 const emptyForm: FormData = {
   name: '',
   age: '',
+  sex: '',
   heightValue: '',
   weightValue: '',
   heightUnit: 'cm',
@@ -110,7 +113,7 @@ const emptyForm: FormData = {
 export default function CoachOnboarding() {
   const { completeOnboarding } = useAuth();
   const { lang, setLang, t } = useLanguage();
-  const bubbleRef = useRef<CoachBubbleHandle>(null);
+  const bubbleRef = useRef<CoachBubbleHandle>(null) as any;
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(emptyForm);
@@ -193,6 +196,10 @@ export default function CoachOnboarding() {
         return false;
       }
     }
+    if (s === 'sex' && !form.sex) {
+      Alert.alert('', t('validation.required') || 'Please select an option');
+      return false;
+    }
     if (s === 'height_weight') {
       const h = parseFloat(form.heightValue);
       const w = parseFloat(form.weightValue);
@@ -233,6 +240,7 @@ export default function CoachOnboarding() {
     await completeOnboarding({
       full_name: form.name.trim(),
       age,
+      sex: form.sex || undefined,
       height_cm: heightCm > 0 ? heightCm : undefined,
       weight_kg: weightKg > 0 ? weightKg : undefined,
       goal: form.goal === 'build_habits' ? 'maintain' : (form.goal as any) || 'maintain',
@@ -410,6 +418,37 @@ export default function CoachOnboarding() {
                 maxLength={3}
               />
               <PrimaryBtn label={getConfirmLabel(lang)} onPress={handleNext} />
+            </StepContent>
+          )}
+
+          {/* ── Sex ── */}
+          {currentStep === 'sex' && (
+            <StepContent
+              coachMessage={t('onboarding.sexMessage') || 'What is your biological sex? This helps me calculate your daily calorie and macronutrient targets accurately.'}
+              typingDone={typingDone}
+              onTypeDone={() => setTypingDone(true)}
+              stepKey="sex"
+              bubbleRef={bubbleRef}
+            >
+              <View style={styles.optionsStack}>
+                {['male', 'female'].map((s) => (
+                  <Pressable
+                    key={s}
+                    style={[styles.optionCard, form.sex === s && styles.optionCardActive]}
+                    onPress={() => updateForm({ sex: s as any })}
+                  >
+                    <Text style={[styles.optionCardText, form.sex === s && styles.optionCardTextActive]}>
+                      {s === 'male' ? (t('onboarding.male') || 'Male') : (t('onboarding.female') || 'Female')}
+                    </Text>
+                    {form.sex === s && (
+                      <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+              {form.sex ? (
+                <PrimaryBtn label={getConfirmLabel(lang)} onPress={() => goToStep(step + 1)} />
+              ) : null}
             </StepContent>
           )}
 

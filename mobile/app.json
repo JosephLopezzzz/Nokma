@@ -41,6 +41,12 @@
       "expo-sqlite",
       "react-native-health-connect",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Coach Hoo to access your camera to scan nutrition labels."
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

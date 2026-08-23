@@ -71,6 +71,11 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     marginLeft: 4,
     gap: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   tail: {
     position: 'absolute',

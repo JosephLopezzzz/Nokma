@@ -36,6 +36,9 @@ export const STRINGS = {
   /** Joiner for two-item lists, e.g. "Lunch and Dinner". Spaces are added by the caller. */
   'common.and':            ['and', 'at'],
 
+  'validation.required':   ['Required', 'Kinakailangan'],
+
+
   // Input placeholders. Example values stay recognisable in both languages.
   'ph.exampleName':       ['e.g. Protein Bar', 'hal. Protein Bar'],
   'ph.exampleMenuItem':   ['e.g. 1pc Chickenjoy', 'hal. 1pc Chickenjoy'],
@@ -85,6 +88,8 @@ export const STRINGS = {
   'tab.log':       ['Log Meal', 'Mag-log'],
   'tab.profile':   ['Profile', 'Profile'],
 
+  'dash.steps':    ['Steps', 'Hakbang'],
+
   // ── Onboarding ─────────────────────────────────────────────────────────────
   'onboarding.selectLanguage': ['Select your language', 'Pumili ng wika'],
   'onboarding.exitTitle':      ['Exit setup?', 'Lumabas sa setup?'],
@@ -97,11 +102,17 @@ export const STRINGS = {
   'onboarding.agePlaceholder':  ['Your age', 'Ang iyong edad'],
   'onboarding.height':          ['Height', 'Taas'],
   'onboarding.weight':          ['Weight', 'Timbang'],
+  'onboarding.male':            ['Male', 'Lalaki'],
+  'onboarding.female':          ['Female', 'Babae'],
   'onboarding.goToDashboard':   ['Go to Dashboard', 'Pumunta sa Dashboard'],
 
   'onboarding.welcome': [
     "Hi! I'm Nokma, your coach for tracking meals, calories, and healthy habits. What should I call you?",
     'Kumusta! Ako si Nokma, ang iyong coach para sa pag-track ng pagkain, calories, at malusog na gawi. Ano ang gusto mong itawag ko sa iyo?',
+  ],
+  'onboarding.sexMessage': [
+    "Got it! To give you accurate calorie and macro goals, what is your biological sex?",
+    "Nakuha ko! Para mabigyan kita ng tumpak na calorie at macro goals, ano ang iyong biological sex?",
   ],
   'onboarding.age': [
     'Nice to meet you, {name}! How old are you?',

@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMeals } from '../../context/MealContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -17,10 +16,11 @@ import { FontSize, FontWeight, Spacing, Radius, MEAL_TYPES, ThemeColors } from '
 import type { LogItem } from '../../types';
 import { calculateApi } from '../../services/api';
 import { resolveLogItemKeywords, findAllergenMatches } from '../../services/allergenService';
-import { scanNutritionFacts } from '../../services/nutritionScanner';
+import { ProgressiveNutritionData } from '../../services/nutritionScanner';
 import { isOnline, enqueueTask, processSyncQueue } from '../../services/syncService';
 import AnimatedPressable from '../../components/AnimatedPressable';
 import { useTheme } from '../../context/ThemeContext';
+import ScannerCamera from '../../components/ScannerCamera';
 
 export default function LogMealScreen() {
   const { logMeal } = useMeals();
@@ -37,6 +37,7 @@ export default function LogMealScreen() {
   const [loading,  setLoading]  = useState(false);
   const [tab,      setTab]      = useState<'manual' | 'preview'>('manual');
   const [networkStatus, setNetworkStatus] = useState(true);
+  const [showScanner, setShowScanner] = useState(false);
 
   // Poll for background sync
   useEffect(() => {
@@ -145,56 +146,28 @@ export default function LogMealScreen() {
     }
   };
 
-  const handleScanLabel = async () => {
+  const handleCaptureScanner = async (parsed: ProgressiveNutritionData) => {
+    setShowScanner(false);
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Camera permission is required to scan nutrition labels.');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        base64: true,
-        allowsEditing: true,
-        quality: 0.5,
-      });
-
-      if (!result.canceled && result.assets[0].base64) {
-        const base64 = result.assets[0].base64;
-        const online = await isOnline();
-        
-        if (!online) {
-          // Offline Fallback
-          enqueueTask('scan_nutrition_label', { base64 });
-          showToast({ type: 'success', title: 'Offline', subtitle: 'Label saved. Will process when connection restores.' });
-        } else {
-          // Process immediately
-          setLoading(true);
-          const parsed = await scanNutritionFacts(base64);
-          
-          const scannedItem: LogItem = {
-            type: 'manual',
-            food_type: parsed.food_name,
-            quantity_g: parsed.serving_size_g || 100,
-            manual_macros: {
-              calories: parsed.calories,
-              protein: parsed.protein,
-              carbs: parsed.carbs,
-              fat: parsed.fat,
-            },
-            method: 'raw',
-            with_bones: false,
-          };
-          
-          confirmAddItem(scannedItem);
-          showToast({ type: 'success', title: 'Scan Successful', subtitle: `Added ${parsed.food_name} from label.` });
-        }
-      }
+      const scannedItem: LogItem = {
+        type: 'manual',
+        food_type: parsed.product_name || 'Scanned Food',
+        quantity_g: parsed.serving_size.value || 100,
+        manual_macros: {
+          calories: parsed.nutrition.calories?.value || 0,
+          protein: parsed.nutrition.protein?.value || 0,
+          carbs: parsed.nutrition.total_carbohydrates?.value || 0,
+          fat: parsed.nutrition.total_fat?.value || 0,
+        },
+        method: 'raw',
+        with_bones: false,
+      };
+      
+      confirmAddItem(scannedItem);
+      showToast({ type: 'success', title: 'Scan Successful', subtitle: `Added ${parsed.product_name || 'Scanned Food'} from label.` });
     } catch (e: any) {
       console.error('Scan failed:', e);
       Alert.alert('Scan Failed', e.message || 'Could not read the nutrition label.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -266,7 +239,7 @@ export default function LogMealScreen() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t('log.manualEntry')}</Text>
           
-          <AnimatedPressable style={styles.scanBtn} onPress={handleScanLabel} disabled={loading} scaleTo={0.97}>
+          <AnimatedPressable style={styles.scanBtn} onPress={() => setShowScanner(true)} disabled={loading} scaleTo={0.97}>
             <Ionicons name="barcode-outline" size={24} color={colors.primary} />
             <Text style={styles.scanBtnText}>Scan Nutrition Facts Label</Text>
           </AnimatedPressable>
@@ -291,6 +264,12 @@ export default function LogMealScreen() {
           }
         </AnimatedPressable>
       </ScrollView>
+
+      <ScannerCamera 
+        visible={showScanner} 
+        onClose={() => setShowScanner(false)} 
+        onCapture={handleCaptureScanner} 
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -329,6 +308,11 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     borderColor: colors.border,
     marginRight: 8,
     backgroundColor: colors.bgInput,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   mealTypeText: {
     fontSize: FontSize.sm,

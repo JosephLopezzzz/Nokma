@@ -14,8 +14,10 @@ import { getMealTypeLabel, getGoalLabel, labelForOptionKey } from '../../constan
 import type { StringKey } from '../../constants/strings';
 import { FontSize, FontWeight, Spacing, Radius, MEAL_TYPES, ThemeColors } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
-import { FOODS_DB, RECIPES_DB, RESTAURANT_DB, calculateItemMacros, recommendApi } from '../../services/api';
+import { calculateItemMacros, recommendApi, RESTAURANT_DB, RECIPES_DB, FOODS_DB } from '../../services/api';
 import { resolveLogItemKeywords, findAllergenMatches } from '../../services/allergenService';
+import ScannerCamera from '../../components/ScannerCamera';
+import { ProgressiveNutritionData } from '../../services/nutritionScanner';
 
 // ─── Mascot Image Map (root-level high-res for header) ───────────────────────
 const MASCOT_IMAGES = {
@@ -92,14 +94,7 @@ const QUICK_SUGGESTION_KEYS: StringKey[] = [
 ];
 
 export default function ChatScreen() {
-  // State for simulated OCR scanner
-  const [ocrModalVisible, setOcrModalVisible] = useState(false);
-  const [scannedName, setScannedName] = useState('');
-  const [scannedCals, setScannedCals] = useState('');
-  const [scannedProtein, setScannedProtein] = useState('');
-  const [scannedCarbs, setScannedCarbs] = useState('');
-  const [scannedFat, setScannedFat] = useState('');
-  const [scannedMealType, setScannedMealType] = useState('snack');
+  const [scannerCameraVisible, setScannerCameraVisible] = useState(false);
 
   const { logMeal, deleteMeal, totals, targets, remaining, meals } = useMeals();
   const { user } = useAuth();
@@ -717,63 +712,41 @@ export default function ChatScreen() {
     }, 1500);
   };
 
-  const handleScanNutrition = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(t('ocr.permissionDenied'), t('ocr.cameraRequiredLabel'));
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
-    if (!result.canceled) {
-      Alert.alert(
-        t('ocr.simulatedTitle'),
-        t('ocr.simulatedLabelBody'),
-        [
-          { text: t('common.ok'), onPress: () => {
-              setScannedName('');
-              setScannedCals(''); setScannedProtein(''); setScannedCarbs(''); setScannedFat('');
-              setScannedMealType('snack');
-              setOcrModalVisible(true);
-          }}
-        ]
-      );
-    }
-  };
+  const handleCaptureScanner = async (parsed: ProgressiveNutritionData) => {
+    setScannerCameraVisible(false);
 
-  const handleSubmitOcr = async () => {
-    if (!scannedName) return Alert.alert(t('common.error'), t('ocr.nameRequired'));
-    const c = parseFloat(scannedCals) || 0;
-    const p = parseFloat(scannedProtein) || 0;
-    const cb = parseFloat(scannedCarbs) || 0;
-    const f = parseFloat(scannedFat) || 0;
-
-    setOcrModalVisible(false);
+    const c = parsed.nutrition.calories?.value || 0;
+    const p = parsed.nutrition.protein?.value || 0;
+    const cb = parsed.nutrition.total_carbohydrates?.value || 0;
+    const f = parsed.nutrition.total_fat?.value || 0;
+    const foodName = parsed.product_name || 'Scanned Food';
+    const mealType = 'snack';
 
     const ocrHour = new Date().getHours();
     const isLate = ocrHour >= 22 || ocrHour < 5;
 
     // Send user message
-    const userMsg: Message = { id: Math.random().toString(), sender: 'user', text: t('chat.scannedPrefix', { name: scannedName }), timestamp: new Date() };
+    const userMsg: Message = { id: Math.random().toString(), sender: 'user', text: t('chat.scannedPrefix', { name: foodName }), timestamp: new Date() };
     setMessages((prev) => [...prev, userMsg]);
     setIsTyping(true);
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      await logMeal(scannedMealType, [{
+      await logMeal(mealType, [{
         type: 'manual',
-        quantity_g: 100, // Normalized to 1 serving
-        food_type: scannedName,
+        quantity_g: parsed.serving_size.value || 100, // Normalized to 1 serving
+        food_type: foodName,
         method: 'raw',
         with_bones: false,
         manual_macros: { calories: c, protein: p, carbs: cb, fat: f }
       }]);
 
-      const matched = findAllergenMatches(user, [scannedName]);
+      const matched = findAllergenMatches(user, [foodName]);
 
       setTimeout(() => {
         let replyText = t('chat.scanLogged', {
-          name: scannedName,
-          mealType: getMealTypeLabel(lang, scannedMealType),
+          name: foodName,
+          mealType: getMealTypeLabel(lang, mealType),
           cal: c, p, c: cb, f,
         });
         let mascot: MascotState = p > 15 ? 'flex' : 'streak';
@@ -798,10 +771,9 @@ export default function ChatScreen() {
         changeMascotState(mascot, status);
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       }, 1500);
-
-    } catch (err: any) {
+    } catch (e: any) {
       setIsTyping(false);
-      Alert.alert(t('common.error'), t('ocr.failedLog'));
+      Alert.alert('Scan Failed', e.message || 'Could not save the nutrition label.');
     }
   };
 
@@ -880,7 +852,7 @@ export default function ChatScreen() {
 
       {/* Message Input Bar */}
       <View style={styles.inputContainer}>
-        <Pressable style={styles.attachBtn} onPress={handleScanNutrition}>
+        <Pressable style={styles.attachBtn} onPress={() => setScannerCameraVisible(true)}>
           <Ionicons name="camera" size={24} color={colors.textMuted} />
         </Pressable>
         <TextInput
@@ -901,49 +873,11 @@ export default function ChatScreen() {
         </Pressable>
       </View>
 
-      {/* OCR Manual Entry Modal */}
-      <Modal visible={ocrModalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t('ocr.addScanned')}</Text>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
-              <Text style={styles.inputLabel}>{t('ocr.foodName')}</Text>
-              <TextInput style={styles.modalInput} placeholder={t('ph.exampleName')} placeholderTextColor={colors.textMuted} value={scannedName} onChangeText={setScannedName} />
-
-              <Text style={styles.inputLabel}>{t('ocr.mealType')}</Text>
-              <View style={styles.mealTypeChips}>
-                {MEAL_TYPES.map((mt) => (
-                  <Pressable key={mt.key} style={[styles.mealTypeChip, scannedMealType === mt.key && styles.mealTypeChipActive]} onPress={() => setScannedMealType(mt.key)}>
-                    <Text style={[styles.mealTypeChipText, scannedMealType === mt.key && styles.mealTypeChipTextActive]}>{getMealTypeLabel(lang, mt.key)}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text style={styles.inputLabel}>{t('macro.calories')}</Text>
-              <TextInput style={styles.modalInput} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={scannedCals} onChangeText={setScannedCals} />
-
-              <Text style={styles.inputLabel}>{t('macro.proteinG')}</Text>
-              <TextInput style={styles.modalInput} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={scannedProtein} onChangeText={setScannedProtein} />
-
-              <Text style={styles.inputLabel}>{t('macro.carbsG')}</Text>
-              <TextInput style={styles.modalInput} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={scannedCarbs} onChangeText={setScannedCarbs} />
-
-              <Text style={styles.inputLabel}>{t('macro.fatG')}</Text>
-              <TextInput style={styles.modalInput} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={scannedFat} onChangeText={setScannedFat} />
-
-              <View style={styles.modalBtnRow}>
-                <Pressable style={styles.modalCancelBtn} onPress={() => setOcrModalVisible(false)}>
-                  <Text style={styles.modalCancelText}>{t('common.cancel')}</Text>
-                </Pressable>
-                <Pressable style={styles.modalSaveBtn} onPress={handleSubmitOcr}>
-                  <Text style={styles.modalSaveText}>{t('ocr.logToMeal')}</Text>
-                </Pressable>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
+      <ScannerCamera 
+        visible={scannerCameraVisible} 
+        onClose={() => setScannerCameraVisible(false)} 
+        onCapture={handleCaptureScanner} 
+      />
     </KeyboardAvoidingView>
   );
 }

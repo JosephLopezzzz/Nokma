@@ -1,6 +1,5 @@
 import { getDb } from './db';
 import * as Network from 'expo-network';
-import { scanNutritionFacts } from './nutritionScanner';
 
 export type SyncTaskType = 'scan_nutrition_label';
 
@@ -76,15 +75,7 @@ export const processSyncQueue = async (onTaskComplete?: (type: SyncTaskType, res
   for (const task of tasks) {
     try {
       if (task.type === 'scan_nutrition_label') {
-        const payload = JSON.parse(task.payload);
-        const base64Image = payload.base64;
-        
-        // Execute the AI scan
-        const parsed = await scanNutritionFacts(base64Image);
-        
-        if (onTaskComplete) {
-          onTaskComplete(task.type, parsed);
-        }
+        console.log('Skipping offline scan_nutrition_label task - requires streaming UI now.');
       }
       
       // Mark as done
