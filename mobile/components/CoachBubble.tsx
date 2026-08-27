@@ -6,6 +6,7 @@ import type { TypewriterTextHandle } from './TypewriterText';
 import { FontSize, FontWeight, Spacing, Radius } from '../constants/theme';
 
 interface CoachBubbleProps {
+  mascotState?: 'idle' | 'worry' | 'streak' | 'sleep' | 'flex';
   message: string;
   typewriter?: boolean;
   typewriterSpeed?: number;
@@ -16,10 +17,35 @@ export interface CoachBubbleHandle {
   skip: () => void;
 }
 
+const mascotImages = {
+  idle: require('../assets/mascot/idle.gif'),
+  worry: require('../assets/mascot/worry.png'),
+  streak: require('../assets/mascot/streak.png'),
+  sleep: require('../assets/mascot/sleeppp.png'),
+  flex: require('../assets/mascot/flex.png'),
+};
+
+const getMascotStyle = (state: string) => {
+  switch (state) {
+    case 'flex':
+      return { width: 300, height: 300, position: 'absolute', left: -50, bottom: -30, zIndex: 2 };
+    case 'streak':
+      return { width: 280, height: 280, position: 'absolute', alignSelf: 'center', bottom: -20, zIndex: 2 };
+    case 'worry':
+      return { width: 280, height: 280, position: 'absolute', left: -40, bottom: -20, zIndex: 2 };
+    case 'sleep':
+      return { width: 260, height: 260, position: 'absolute', alignSelf: 'center', bottom: -20, zIndex: 2 };
+    case 'idle':
+    default:
+      return { width: 250, height: 250, position: 'absolute', alignSelf: 'center', bottom: -10, zIndex: 2 };
+  }
+};
+
 const CoachBubbleRender: React.ForwardRefRenderFunction<CoachBubbleHandle, CoachBubbleProps> = ({
   message,
   typewriter = true,
   typewriterSpeed = 20,
+  mascotState = 'idle',
   onTypeComplete,
 }, ref) => {
   const typewriterRef = useRef<TypewriterTextHandle>(null);
@@ -54,8 +80,8 @@ const CoachBubbleRender: React.ForwardRefRenderFunction<CoachBubbleHandle, Coach
       <View style={styles.mascotStage}>
         <View style={styles.backdropAngle} />
         <Image
-          source={require('../assets/mascot/idle.gif')}
-          style={styles.mascot}
+          source={mascotImages[mascotState]}
+          style={[styles.mascot, getMascotStyle(mascotState) as any]}
           contentFit="contain"
           priority="low"
           cachePolicy="memory-disk"
@@ -87,7 +113,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   mascotStage: {
-    height: 140,
+    height: 240,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.md,

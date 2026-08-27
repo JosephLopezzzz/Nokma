@@ -309,7 +309,7 @@ export default function CoachOnboarding() {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm }]}>
         {isFirstStep ? (
@@ -833,6 +833,22 @@ function StepContent({
   children: React.ReactNode;
   bubbleRef?: React.RefObject<CoachBubbleHandle>;
 }) {
+  const getMascotState = (s: string) => {
+    switch (s) {
+      case 'welcome': return 'flex';
+      case 'age': return 'idle';
+      case 'sex': return 'idle';
+      case 'height_weight': return 'flex';
+      case 'feedback': return 'streak';
+      case 'goal': return 'streak';
+      case 'activity': return 'flex';
+      case 'health': return 'worry';
+      case 'allergies': return 'worry';
+      case 'finish': return 'sleep';
+      default: return 'idle';
+    }
+  };
+
   return (
     <View key={stepKey} style={styles.stepContent}>
       <CoachBubble
@@ -841,6 +857,7 @@ function StepContent({
         typewriter
         typewriterSpeed={15}
         onTypeComplete={onTypeDone}
+        mascotState={getMascotState(stepKey) as any}
       />
       {typingDone && <View style={styles.inputArea}>{children}</View>}
     </View>
@@ -961,7 +978,7 @@ const styles = StyleSheet.create({
   scroll: {
     padding: Spacing.lg,
     paddingTop: 0,
-    paddingBottom: 60,
+    paddingBottom: 150,
     flexGrow: 1,
   },
   stepContent: { gap: Spacing.md },
@@ -1078,12 +1095,15 @@ const styles = StyleSheet.create({
   langMascotStage: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 140,
+    height: 240,
     marginBottom: Spacing.sm,
+    position: 'relative',
   },
   langMascot: {
-    width: 120,
-    height: 120,
+    width: 250,
+    height: 250,
+    position: 'absolute',
+    bottom: -10,
   },
   langTitle: {
     fontSize: 22,
