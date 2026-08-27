@@ -47,6 +47,7 @@ function RootLayoutNav() {
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
             <Stack.Screen name="(onboarding)" />
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="chat-modal" options={{ presentation: 'transparentModal', animation: 'fade' }} />
           </Stack>
         </View>
       </View>

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { router } from 'expo-router';
 import {
   View, Text, StyleSheet, TextInput, FlatList,
   Pressable, KeyboardAvoidingView, Platform, Image,
@@ -7,36 +8,36 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMeals } from '../../context/MealContext';
-import { useAuth } from '../../context/AuthContext';
-import { useLanguage } from '../../context/LanguageContext';
-import { getMealTypeLabel, getGoalLabel, labelForOptionKey } from '../../constants/i18n';
-import type { StringKey } from '../../constants/strings';
-import { FontSize, FontWeight, Spacing, Radius, MEAL_TYPES, ThemeColors } from '../../constants/theme';
-import { useTheme } from '../../context/ThemeContext';
-import { calculateItemMacros, recommendApi, RESTAURANT_DB, RECIPES_DB, FOODS_DB } from '../../services/api';
-import { resolveLogItemKeywords, findAllergenMatches } from '../../services/allergenService';
-import ScannerCamera from '../../components/ScannerCamera';
-import { ProgressiveNutritionData } from '../../services/nutritionScanner';
+import { useMeals } from '../context/MealContext';
+import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import { getMealTypeLabel, getGoalLabel, labelForOptionKey } from '../constants/i18n';
+import type { StringKey } from '../constants/strings';
+import { FontSize, FontWeight, Spacing, Radius, MEAL_TYPES, ThemeColors } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
+import { calculateItemMacros, recommendApi, RESTAURANT_DB, RECIPES_DB, FOODS_DB } from '../services/api';
+import { resolveLogItemKeywords, findAllergenMatches } from '../services/allergenService';
+import ScannerCamera from '../components/ScannerCamera';
+import { ProgressiveNutritionData } from '../services/nutritionScanner';
 import NetInfo from '@react-native-community/netinfo';
-import { streamChatResponse, ChatMessage, ChatAiContext } from '../../services/chatAiService';
+import { streamChatResponse, ChatMessage, ChatAiContext } from '../services/chatAiService';
 
 // ─── Mascot Image Map (root-level high-res for header) ───────────────────────
 const MASCOT_IMAGES = {
-  idle:    require('../../assets/mascot/idle.gif'),
-  worry:   require('../../assets/mascot/worry.png'),
-  sleeppp: require('../../assets/mascot/sleeppp.png'),
-  streak:  require('../../assets/mascot/streak.png'),
-  flex:    require('../../assets/mascot/flex.png'),
+  idle:    require('../assets/mascot/idle.gif'),
+  worry:   require('../assets/mascot/worry.png'),
+  sleeppp: require('../assets/mascot/sleeppp.png'),
+  streak:  require('../assets/mascot/streak.png'),
+  flex:    require('../assets/mascot/flex.png'),
 };
 
 // ─── Small avatars for chat bubbles ──────────────────────────────────────────
 const MASCOT_AVATARS = {
-  idle:    require('../../assets/mascot/idle.gif'),
-  worry:   require('../../assets/mascot/worry.png'),
-  sleeppp: require('../../assets/mascot/sleeppp.png'),
-  streak:  require('../../assets/mascot/streak.png'),
-  flex:    require('../../assets/mascot/flex.png'),
+  idle:    require('../assets/mascot/idle.gif'),
+  worry:   require('../assets/mascot/worry.png'),
+  sleeppp: require('../assets/mascot/sleeppp.png'),
+  streak:  require('../assets/mascot/streak.png'),
+  flex:    require('../assets/mascot/flex.png'),
 };
 
 type MascotState = keyof typeof MASCOT_IMAGES;
@@ -99,7 +100,12 @@ const MessageItem = React.memo(({ item, styles }: { item: Message, styles: any }
   const isCoach = item.sender === 'coach';
   return (
     <View style={[styles.msgWrapper, isCoach ? styles.msgCoachWrapper : styles.msgUserWrapper]}>
-      <View style={[styles.msgBubble, isCoach ? styles.msgBubbleCoach : styles.msgBubbleUser]}>
+      {isCoach && (
+        <View style={styles.coachAvatarCircle}>
+          <Image source={require('../assets/mascot/chatbot update.png')} style={styles.coachAvatar} resizeMode="cover" />
+        </View>
+      )}
+      <View style={[styles.msgBubble, isCoach ? styles.msgBubbleCoach : styles.msgBubbleUser, { flexShrink: 1 }]}>
         <Text style={[styles.msgText, isCoach ? styles.msgTextCoach : styles.msgTextUser]}>
           {item.text}
         </Text>
@@ -107,6 +113,11 @@ const MessageItem = React.memo(({ item, styles }: { item: Message, styles: any }
           {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </Text>
       </View>
+      {!isCoach && (
+        <View style={styles.userAvatarCircle}>
+          <Ionicons name="person" size={24} color={styles.msgBubbleUser.backgroundColor} />
+        </View>
+      )}
     </View>
   );
 }, (prev, next) => prev.item.text === next.item.text && prev.item.id === next.item.id);
@@ -128,7 +139,10 @@ const StreamingBubble = forwardRef<StreamingBubbleRef, { styles: any }>((props, 
 
   return (
     <View style={[props.styles.msgWrapper, props.styles.msgCoachWrapper]}>
-      <View style={[props.styles.msgBubble, props.styles.msgBubbleCoach]}>
+      <View style={props.styles.coachAvatarCircle}>
+        <Image source={require('../assets/mascot/chatbot update.png')} style={props.styles.coachAvatar} resizeMode="cover" />
+      </View>
+      <View style={[props.styles.msgBubble, props.styles.msgBubbleCoach, { flexShrink: 1 }]}>
         <Text style={[props.styles.msgText, props.styles.msgTextCoach]}>
           {text}
         </Text>
@@ -929,25 +943,23 @@ export default function ChatScreen() {
   }, [styles]);
 
   return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      {/* Mascot Header View */}
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
-        <Animated.View style={[styles.mascotFrame, { opacity: fadeAnim, transform: [{ scale: scaleAnim }, { scale: breathAnim }] }]}>
-          <Image
-            source={MASCOT_IMAGES[mascotState]}
-            style={styles.mascotImg}
-            resizeMode="contain"
-          />
-        </Animated.View>
-        <View style={styles.headerInfo}>
-          <Text style={styles.coachTitle}>Nokma 🐔</Text>
-          <View style={styles.statusBubble}>
-            <View style={[styles.statusDot, { backgroundColor: mascotState === 'worry' ? colors.error : mascotState === 'sleeppp' ? colors.textMuted : colors.success }]} />
-            <Text style={styles.statusText}>{t(mascotStatusKey)}</Text>
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => router.back()} />
+      <View style={[styles.chatContainer, { paddingBottom: insets.bottom }]}>
+        {/* Simple Header View */}
+        <View style={styles.header}>
+          <View style={styles.headerInfo}>
+            <Text style={styles.coachTitle}>Nokma 🐔</Text>
+            <View style={styles.statusBubble}>
+              <View style={[styles.statusDot, { backgroundColor: mascotState === 'worry' ? colors.error : mascotState === 'sleeppp' ? colors.textMuted : colors.success }]} />
+              <Text style={styles.statusText}>{t(mascotStatusKey)}</Text>
+            </View>
           </View>
+          <Pressable onPress={() => router.back()} style={styles.closeBtn}>
+            <Ionicons name="close-circle" size={32} color={colors.border} />
+          </Pressable>
         </View>
-      </View>
-
+      
       {/* Chat Messages */}
       <FlatList
         ref={flatListRef}
@@ -1010,6 +1022,7 @@ export default function ChatScreen() {
         </Pressable>
       </View>
 
+      </View>
       <ScannerCamera 
         visible={scannerCameraVisible} 
         onClose={() => setScannerCameraVisible(false)} 
@@ -1020,29 +1033,27 @@ export default function ChatScreen() {
 }
 
 const getStyles = (colors: ThemeColors) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  chatContainer: {
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '75%',
+    overflow: 'hidden',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: colors.bgCard,
     gap: Spacing.md,
-  },
-  mascotFrame: {
-    width: 72,
-    height: 72,
-    borderRadius: Radius.md,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  mascotImg: {
-    width: '100%',
-    height: '100%',
   },
   headerInfo: {
     flex: 1,
@@ -1068,6 +1079,9 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: FontWeight.medium,
   },
+  closeBtn: {
+    padding: 8,
+  },
   chatList: {
     padding: Spacing.md,
     paddingBottom: Spacing.lg,
@@ -1075,8 +1089,8 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   msgWrapper: {
     flexDirection: 'row',
-    marginBottom: Spacing.xs,
-    maxWidth: '85%',
+    marginBottom: Spacing.sm,
+    maxWidth: '95%',
   },
   msgCoachWrapper: {
     alignSelf: 'flex-start',
@@ -1085,12 +1099,14 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   msgUserWrapper: {
     alignSelf: 'flex-end',
+    alignItems: 'flex-end',
     justifyContent: 'flex-end',
+    gap: 8,
   },
   coachAvatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.bgElevated,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1099,8 +1115,19 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     overflow: 'hidden',
   },
   coachAvatar: {
-    width: '115%',
-    height: '115%',
+    width: '100%',
+    height: '100%',
+  },
+  userAvatarCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   msgBubble: {
     borderRadius: Radius.lg,
