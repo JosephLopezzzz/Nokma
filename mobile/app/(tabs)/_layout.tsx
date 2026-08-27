@@ -108,7 +108,31 @@ export default function TabLayout() {
           name="log"
           options={{
             title: t('tab.log'),
-            href: null,
+            tabBarIcon: () => (
+              <View style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: colors.primary,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: 20,
+                shadowColor: colors.primary,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 6,
+                elevation: 5,
+              }}>
+                <Ionicons name="scan" size={28} color="#fff" />
+              </View>
+            ),
+            tabBarLabel: () => null,
+          }}
+          listeners={{
+            tabPress: (e) => {
+              e.preventDefault();
+              router.push({ pathname: '/log', params: { openScanner: 'true' } });
+            },
           }}
         />
         <Tabs.Screen

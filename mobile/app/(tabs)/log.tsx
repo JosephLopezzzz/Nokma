@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMeals } from '../../context/MealContext';
@@ -38,6 +39,14 @@ export default function LogMealScreen() {
   const [tab,      setTab]      = useState<'manual' | 'preview'>('manual');
   const [networkStatus, setNetworkStatus] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
+  const params = useLocalSearchParams();
+
+  useEffect(() => {
+    if (params.openScanner === 'true') {
+      setShowScanner(true);
+      router.setParams({ openScanner: '' });
+    }
+  }, [params.openScanner]);
 
   // Poll for background sync
   useEffect(() => {

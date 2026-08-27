@@ -943,7 +943,7 @@ export default function ChatScreen() {
   }, [styles]);
 
   return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
       <Pressable style={StyleSheet.absoluteFill} onPress={() => router.back()} />
       <View style={[styles.chatContainer, { paddingBottom: insets.bottom }]}>
         {/* Simple Header View */}
@@ -1021,7 +1021,6 @@ export default function ChatScreen() {
           <Ionicons name="send" size={18} color={colors.textInverse} />
         </Pressable>
       </View>
-
       </View>
       <ScannerCamera 
         visible={scannerCameraVisible} 
@@ -1042,7 +1041,8 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.bg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: '75%',
+    flex: 1,
+    marginTop: '25%',
     overflow: 'hidden',
   },
   header: {
