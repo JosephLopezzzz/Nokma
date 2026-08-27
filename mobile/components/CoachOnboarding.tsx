@@ -28,6 +28,7 @@ import {
   getFeedbackMessage,
   getGoalMessage,
   getGoalLabel,
+  getActivityLevelMessage,
   getHealthConditionMessage,
   getHealthConditionNoResponse,
   getHealthConditionWhichMessage,
@@ -58,6 +59,7 @@ import {
   getHealthConditionGroups,
   getAllergenGroups,
   getMetaOptions,
+  getActivityLabel,
 } from '../constants/i18n';
 import { Colors, FontSize, FontWeight, Spacing, Radius } from '../constants/theme';
 
@@ -69,6 +71,7 @@ const STEPS = [
   'height_weight',
   'feedback',
   'goal',
+  'activity',
   'health',
   'allergies',
   'finish',
@@ -83,6 +86,7 @@ interface FormData {
   heightUnit: 'cm' | 'in';
   weightUnit: 'kg' | 'lbs';
   goal: string;
+  activityLevel: number | '';
   healthAnswer: '' | 'no' | 'yes' | 'skip';
   healthConditions: string[];
   healthConditionOther: string;
@@ -101,6 +105,7 @@ const emptyForm: FormData = {
   heightUnit: 'cm',
   weightUnit: 'kg',
   goal: '',
+  activityLevel: '',
   healthAnswer: '',
   healthConditions: [],
   healthConditionOther: '',
@@ -212,6 +217,10 @@ export default function CoachOnboarding() {
         return false;
       }
     }
+    if (s === 'activity' && form.activityLevel === '') {
+      Alert.alert('', t('validation.required') || 'Please select an option');
+      return false;
+    }
     return true;
   };
 
@@ -244,6 +253,7 @@ export default function CoachOnboarding() {
       height_cm: heightCm > 0 ? heightCm : undefined,
       weight_kg: weightKg > 0 ? weightKg : undefined,
       goal: form.goal === 'build_habits' ? 'maintain' : (form.goal as any) || 'maintain',
+      activity_level: (form.activityLevel as any) || 2,
       health_condition: healthConditions ? healthConditions.join(',') : healthConditions,
       health_condition_custom: hasHealth && form.healthConditionOther ? form.healthConditionOther : undefined,
       allergies: allergyItems,
@@ -552,6 +562,42 @@ export default function CoachOnboarding() {
             </StepContent>
           )}
 
+          {/* ── Activity ── */}
+          {currentStep === 'activity' && (
+            <StepContent
+              coachMessage={getActivityLevelMessage(lang)}
+              typingDone={typingDone}
+              onTypeDone={() => setTypingDone(true)}
+              stepKey="activity"
+              bubbleRef={bubbleRef}
+            >
+              <View style={styles.optionsStack}>
+                {[1, 2, 3, 4, 5].map((lvl) => (
+                  <Pressable
+                    key={lvl}
+                    style={[styles.optionCard, form.activityLevel === lvl && styles.optionCardActive]}
+                    onPress={() => updateForm({ activityLevel: lvl })}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.optionCardText, form.activityLevel === lvl && styles.optionCardTextActive]}>
+                        {t(`activity.${lvl}` as any)}
+                      </Text>
+                      <Text style={[styles.unitText, { marginTop: 2, opacity: 0.8 }, form.activityLevel === lvl && { color: Colors.primary }]}>
+                        {t(`onboarding.activity.${lvl}.desc` as any)}
+                      </Text>
+                    </View>
+                    {form.activityLevel === lvl && (
+                      <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+              {form.activityLevel ? (
+                <PrimaryBtn label={getConfirmLabel(lang)} onPress={() => goToStep(step + 1)} />
+              ) : null}
+            </StepContent>
+          )}
+
           {/* ── Health condition ── */}
           {currentStep === 'health' && (
             <StepContent
@@ -819,6 +865,11 @@ function ReviewSummary({ form, lang }: { form: FormData; lang: 'english' | 'fili
     ? getGoalLabel(lang, form.goal)
     : isEn ? 'Not set' : 'Hindi itinakda';
 
+  // Build activity display
+  const activityDisplay = form.activityLevel
+    ? getActivityLabel(lang, form.activityLevel)
+    : isEn ? 'Not set' : 'Hindi itinakda';
+
   // Build health conditions display
   let healthDisplay: string;
   if (form.healthAnswer === 'skip') {
@@ -853,6 +904,7 @@ function ReviewSummary({ form, lang }: { form: FormData; lang: 'english' | 'fili
     { icon: 'resize-outline', label: isEn ? 'Height' : 'Taas', value: heightDisplay },
     { icon: 'barbell-outline', label: isEn ? 'Weight' : 'Bigat', value: weightDisplay },
     { icon: 'flag-outline', label: isEn ? 'Goal' : 'Layunin', value: goalDisplay },
+    { icon: 'walk-outline', label: isEn ? 'Activity' : 'Aktibidad', value: activityDisplay },
     { icon: 'heart-outline', label: isEn ? 'Health Conditions' : 'Kalagayang Pangkalusugan', value: healthDisplay },
     { icon: 'warning-outline', label: isEn ? 'Allergies' : 'Mga Alerhiya', value: allergiesDisplay },
   ];

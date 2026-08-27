@@ -134,6 +134,15 @@ export const STRINGS = {
     'Based on what you shared, one option you may want to consider is {goal}, but you are always in control of your goal.',
     'Batay sa iyong ibinahagi, isang opsyon na maaari mong pag-isipan ay ang {goal}, pero ikaw pa rin ang may kontrol sa iyong goal.',
   ],
+  'onboarding.activityQuestion': [
+    'How active are you in your daily life? This helps me accurately calculate your metabolism and daily calorie needs.',
+    'Gaano ka kaaktibo sa iyong pang-araw-araw na buhay? Nakakatulong ito para tumpak kong makalkula ang iyong metabolismo at kailangang calorie.',
+  ],
+  'onboarding.activity.1.desc': ['Little to no exercise', 'Kaunti o walang ehersisyo'],
+  'onboarding.activity.2.desc': ['Light exercise 1-3 days/week', 'Magaang ehersisyo 1-3 araw/linggo'],
+  'onboarding.activity.3.desc': ['Moderate exercise 3-5 days/week', 'Katamtamang ehersisyo 3-5 araw/linggo'],
+  'onboarding.activity.4.desc': ['Hard exercise 6-7 days/week', 'Mabigat na ehersisyo 6-7 araw/linggo'],
+  'onboarding.activity.5.desc': ['Physical job or training 2x/day', 'Pisikal na trabaho o training 2x/araw'],
   'onboarding.finish': [
     "You're all set, {name}! I'll be here to help you track your progress, celebrate your consistency, and take things one day at a time.",
     'Handa ka na, {name}! Nandito ako para tulungan kang i-track ang iyong progress, ipagdiwang ang iyong consistency, at gawin ang mga bagay isa-isa.',

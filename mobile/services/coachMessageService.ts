@@ -49,6 +49,10 @@ export function getGoalLabel(lang: Language, key: string): string {
   return goalLabel(lang, key);
 }
 
+export function getActivityLevelMessage(lang: Language): string {
+  return translate(lang, 'onboarding.activityQuestion');
+}
+
 export function getHealthConditionMessage(lang: Language): string {
   return translate(lang, 'onboarding.healthQuestion');
 }
