@@ -854,10 +854,14 @@ export default function ChatScreen() {
         (err) => {
           streamingBubbleRef.current?.clear();
           console.log('Gemini error:', err);
+          let errorMsg = "Bawk! My AI brain is a bit scrambled right now. Please try again later!";
+          if (err.includes('429')) {
+            errorMsg = "Bawk! You're talking too fast! Give me a few seconds to catch my breath before sending another message. 🐔💦";
+          }
           setMessages((prev) => [...prev, {
             id: Math.random().toString(),
             sender: 'coach',
-            text: "Bawk! My AI brain is a bit scrambled right now. Please try again later!",
+            text: errorMsg,
             timestamp: new Date(),
             mascotState: 'worry'
           }]);
