@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Animated, Dimensions, Modal, ScrollView } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Animated, Dimensions, Modal, ScrollView, Image } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ const SCANNER_RADIUS = 32;
 export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCameraProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [scannedData, setScannedData] = useState<ProgressiveNutritionData | null>(null);
   const cameraRef = useRef<CameraView>(null);
   const { colors } = useTheme();
@@ -78,10 +79,9 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
       setIsProcessing(true);
       setScannedData(createEmptyNutritionData());
       try {
-        // We freeze the camera while analyzing by taking the picture, then waiting for AI.
-        // Actually, expo-camera will keep previewing unless we pause it, but that's fine.
         const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
-        if (photo?.base64) {
+        if (photo?.base64 && photo?.uri) {
+          setCapturedImage(photo.uri);
           const finalData = await scanNutritionFactsProgressive(photo.base64, (partialData) => {
             setScannedData({ ...partialData });
           });
@@ -89,16 +89,19 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
           setTimeout(() => {
             setIsProcessing(false);
             setScannedData(null);
+            setCapturedImage(null);
             onCapture(finalData);
           }, 1200);
         } else {
           setIsProcessing(false);
           setScannedData(null);
+          setCapturedImage(null);
         }
       } catch (err) {
         console.error('Camera error:', err);
         setIsProcessing(false);
         setScannedData(null);
+        setCapturedImage(null);
       }
     }
   };
@@ -142,88 +145,91 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>
       <View style={styles.container}>
-        <CameraView style={styles.camera} ref={cameraRef} facing="back">
+        <CameraView style={StyleSheet.absoluteFillObject} ref={cameraRef} facing="back" />
+        
+        {capturedImage && (
+          <Image source={{ uri: capturedImage }} style={StyleSheet.absoluteFillObject} />
+        )}
           
-          {/* True Cutout Overlay using SVG Mask */}
-          <Svg style={StyleSheet.absoluteFill}>
-            <Defs>
-              <Mask id="mask">
-                <Rect x={0} y={0} width="100%" height="100%" fill="white" />
-                <Rect 
-                  x={(width - SCANNER_SIZE) / 2} 
-                  y={(height - SCANNER_SIZE) / 2 - 40} 
-                  width={SCANNER_SIZE} 
-                  height={SCANNER_SIZE} 
-                  rx={SCANNER_RADIUS} 
-                  fill="black" 
-                />
-              </Mask>
-            </Defs>
-            <Rect x={0} y={0} width="100%" height="100%" fill="rgba(0,0,0,0.7)" mask="url(#mask)" />
-          </Svg>
+        {/* True Cutout Overlay using SVG Mask */}
+        <Svg style={StyleSheet.absoluteFill}>
+          <Defs>
+            <Mask id="mask">
+              <Rect x={0} y={0} width="100%" height="100%" fill="white" />
+              <Rect 
+                x={(width - SCANNER_SIZE) / 2} 
+                y={(height - SCANNER_SIZE) / 2 - 40} 
+                width={SCANNER_SIZE} 
+                height={SCANNER_SIZE} 
+                rx={SCANNER_RADIUS} 
+                fill="black" 
+              />
+            </Mask>
+          </Defs>
+          <Rect x={0} y={0} width="100%" height="100%" fill="rgba(0,0,0,0.7)" mask="url(#mask)" />
+        </Svg>
 
-          <View style={styles.uiLayer}>
-            {/* Top Bar */}
-            <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-              <TouchableOpacity onPress={onClose} style={styles.iconBtn} disabled={isProcessing}>
-                <Ionicons name="close" size={28} color="white" />
-              </TouchableOpacity>
-              <View style={styles.headerTitleContainer}>
-                <Text style={styles.headerTitle}>AI Scanner</Text>
-                <Text style={styles.headerSubtitle}>Scan Nutrition Facts</Text>
-              </View>
-              <View style={{ width: 28 }} />
+        <View style={[StyleSheet.absoluteFillObject, styles.uiLayer]}>
+          {/* Top Bar */}
+          <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+            <TouchableOpacity onPress={onClose} style={styles.iconBtn} disabled={isProcessing}>
+              <Ionicons name="close" size={28} color="white" />
+            </TouchableOpacity>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerTitle}>AI Scanner</Text>
+              <Text style={styles.headerSubtitle}>Scan Nutrition Facts</Text>
             </View>
+            <View style={{ width: 28 }} />
+          </View>
 
-            {/* Scanner Box Area (absolutely positioned to match SVG hole) */}
-            <View style={styles.scannerArea}>
-              <View style={styles.scannerBox}>
-                {/* Corner Brackets */}
-                <View style={[styles.corner, styles.topLeft]} />
-                <View style={[styles.corner, styles.topRight]} />
-                <View style={[styles.corner, styles.bottomLeft]} />
-                <View style={[styles.corner, styles.bottomRight]} />
-                
-                {/* Laser Animation */}
-                {!isProcessing && (
-                  <Animated.View
-                    style={[
-                      styles.laserContainer,
-                      { transform: [{ translateY: laserAnim }] },
-                    ]}
-                  >
-                    <Svg width="100%" height="100%">
-                      <Defs>
-                        <LinearGradient id="laserGrad" x1="0" y1="0" x2="0" y2="1">
-                          <Stop offset="0" stopColor={colors.primary} stopOpacity="0" />
-                          <Stop offset="0.9" stopColor={colors.primary} stopOpacity="0.4" />
-                          <Stop offset="1" stopColor={colors.primary} stopOpacity="1" />
-                        </LinearGradient>
-                      </Defs>
-                      <Rect width="100%" height="100%" fill="url(#laserGrad)" />
-                    </Svg>
-                  </Animated.View>
-                )}
-              </View>
-            </View>
-
-            {/* Bottom Bar / Progressive UI */}
-            <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.xl }]}>
-              {isProcessing ? (
-                renderProgressiveFields()
-              ) : (
-                <TouchableOpacity 
-                  style={styles.captureBtn} 
-                  onPress={takePicture}
+          {/* Scanner Box Area (absolutely positioned to match SVG hole) */}
+          <View style={styles.scannerArea}>
+            <View style={styles.scannerBox}>
+              {/* Corner Brackets */}
+              <View style={[styles.corner, styles.topLeft]} />
+              <View style={[styles.corner, styles.topRight]} />
+              <View style={[styles.corner, styles.bottomLeft]} />
+              <View style={[styles.corner, styles.bottomRight]} />
+              
+              {/* Laser Animation */}
+              {!isProcessing && (
+                <Animated.View
+                  style={[
+                    styles.laserContainer,
+                    { transform: [{ translateY: laserAnim }] },
+                  ]}
                 >
-                  <View style={styles.captureBtnInner}>
-                    <View style={[styles.captureBtnCore, { backgroundColor: colors.primary }]} />
-                  </View>
-                </TouchableOpacity>
+                  <Svg width="100%" height="100%">
+                    <Defs>
+                      <LinearGradient id="laserGrad" x1="0" y1="0" x2="0" y2="1">
+                        <Stop offset="0" stopColor={colors.primary} stopOpacity="0" />
+                        <Stop offset="0.9" stopColor={colors.primary} stopOpacity="0.4" />
+                        <Stop offset="1" stopColor={colors.primary} stopOpacity="1" />
+                      </LinearGradient>
+                    </Defs>
+                    <Rect width="100%" height="100%" fill="url(#laserGrad)" />
+                  </Svg>
+                </Animated.View>
               )}
             </View>
           </View>
-        </CameraView>
+
+          {/* Bottom Bar / Progressive UI */}
+          <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.xl }]}>
+            {isProcessing ? (
+              renderProgressiveFields()
+            ) : (
+              <TouchableOpacity 
+                style={styles.captureBtn} 
+                onPress={takePicture}
+              >
+                <View style={styles.captureBtnInner}>
+                  <View style={[styles.captureBtnCore, { backgroundColor: colors.primary }]} />
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
       </View>
     </Modal>
   );
