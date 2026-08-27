@@ -128,6 +128,7 @@ export default function DashboardScreen() {
   const trackerRef = useRef<View>(null);
   const coachRef = useRef<View>(null);
   const scrollRef = useRef<ScrollView>(null);
+  const scrollContentRef = useRef<View>(null);
 
   const coach = useCoachMessage(
     user?.full_name,
@@ -219,8 +220,9 @@ export default function DashboardScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={[styles.headerWrapper, { paddingTop: insets.top + Spacing.lg }]}>
+        <View ref={scrollContentRef} style={{ flex: 1 }}>
+          {/* Header */}
+          <View style={[styles.headerWrapper, { paddingTop: insets.top + Spacing.lg }]}>
           <View style={styles.header}>
             {/* NOKMA brand title */}
             <Text style={styles.nokmaTitle}>NOKMA</Text>
@@ -428,14 +430,14 @@ export default function DashboardScreen() {
               ))
             )}
           </View>
+          </View>
         </View>
       </ScrollView>
 
-      {/* Tutorial overlay */}
       <DashboardTutorial
         visible={showTutorial}
         onComplete={() => setShowTutorial(false)}
-        targetRefs={{ fabRef, trackerRef, coachRef }}
+        targetRefs={{ fabRef, trackerRef, coachRef, scrollContentRef }}
         scrollViewRef={scrollRef}
         userName={user?.full_name}
       />

@@ -33,6 +33,7 @@ export interface TutorialTargetRefs {
   fabRef: React.RefObject<View | null>;
   trackerRef: React.RefObject<View | null>;
   coachRef: React.RefObject<View | null>;
+  scrollContentRef?: React.RefObject<View | null>;
 }
 
 function SpotlightCutout({
@@ -134,19 +135,16 @@ export default function DashboardTutorial({
       titleKey: 'tutorial.log.title',
       messageKey: 'tutorial.log.body',
       getRef: () => targetRefs.fabRef,
-      scrollTo: 300,
     },
     {
       titleKey: 'tutorial.track.title',
       messageKey: 'tutorial.track.body',
       getRef: () => targetRefs.trackerRef,
-      scrollTo: 100,
     },
     {
       titleKey: 'tutorial.coach.title',
       messageKey: 'tutorial.coach.body',
       getRef: () => targetRefs.coachRef,
-      scrollTo: 0,
     },
     {
       titleKey: 'tutorial.ready.title',
@@ -166,12 +164,13 @@ export default function DashboardTutorial({
           resolve(null);
           return;
         }
-        ref.current.measureInWindow((x: number, y: number, w: number, h: number) => {
+        // Use measure to get pageX/pageY which includes status bar and is absolute to screen
+        ref.current.measure((x: number, y: number, w: number, h: number, pageX: number, pageY: number) => {
           if (w === 0 && h === 0) {
             resolve(null);
             return;
           }
-          resolve({ top: y, left: x, width: w, height: h, rx: 16, ry: 16 });
+          resolve({ top: pageY, left: pageX, width: w, height: h, rx: 16, ry: 16 });
         });
       });
     },
@@ -193,9 +192,23 @@ export default function DashboardTutorial({
         return;
       }
 
-      if (target.scrollTo !== undefined && scrollViewRef?.current) {
-        scrollViewRef.current.scrollTo({ y: target.scrollTo, animated: true });
-        await new Promise((resolve) => setTimeout(resolve, 500));
+      if (ref.current && scrollViewRef?.current && targetRefs.scrollContentRef?.current) {
+        // Find element's position relative to ScrollView content using native View ref
+        await new Promise<void>((resolve) => {
+          ref.current?.measureLayout(
+            targetRefs.scrollContentRef!.current!,
+            (left, top, width, height) => {
+              // Scroll so the element is roughly centered or in the top third
+              const targetScroll = Math.max(0, top - screenH / 4);
+              scrollViewRef.current?.scrollTo({ y: targetScroll, animated: true });
+              resolve();
+            },
+            () => resolve() // on fail, just continue
+          );
+        });
+        
+        // Wait for scroll animation to completely finish and bounce to settle
+        await new Promise((resolve) => setTimeout(resolve, 600));
       }
 
       let rect = await measureTarget(ref);
@@ -315,7 +328,7 @@ export default function DashboardTutorial({
   }
 
   return (
-    <Modal transparent visible={visible} animationType="fade">
+    <Modal transparent visible={visible} animationType="fade" statusBarTranslucent>
       <View style={styles.root}>
         {spotlight ? (
           <SpotlightCutout rect={spotlight} screenW={screenW} screenH={screenH} />
