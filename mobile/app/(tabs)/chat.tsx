@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, FlatList,
   Pressable, KeyboardAvoidingView, Platform, Image,
@@ -18,6 +18,8 @@ import { calculateItemMacros, recommendApi, RESTAURANT_DB, RECIPES_DB, FOODS_DB 
 import { resolveLogItemKeywords, findAllergenMatches } from '../../services/allergenService';
 import ScannerCamera from '../../components/ScannerCamera';
 import { ProgressiveNutritionData } from '../../services/nutritionScanner';
+import NetInfo from '@react-native-community/netinfo';
+import { streamChatResponse, ChatMessage, ChatAiContext } from '../../services/chatAiService';
 
 // ─── Mascot Image Map (root-level high-res for header) ───────────────────────
 const MASCOT_IMAGES = {
@@ -93,11 +95,54 @@ const QUICK_SUGGESTION_KEYS: StringKey[] = [
   'chat.suggestion.allergies',
 ];
 
+const MessageItem = React.memo(({ item, styles }: { item: Message, styles: any }) => {
+  const isCoach = item.sender === 'coach';
+  return (
+    <View style={[styles.msgWrapper, isCoach ? styles.msgCoachWrapper : styles.msgUserWrapper]}>
+      <View style={[styles.msgBubble, isCoach ? styles.msgBubbleCoach : styles.msgBubbleUser]}>
+        <Text style={[styles.msgText, isCoach ? styles.msgTextCoach : styles.msgTextUser]}>
+          {item.text}
+        </Text>
+        <Text style={[styles.msgTime, isCoach ? styles.msgTimeCoach : styles.msgTimeUser]}>
+          {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+      </View>
+    </View>
+  );
+}, (prev, next) => prev.item.text === next.item.text && prev.item.id === next.item.id);
+
+export interface StreamingBubbleRef {
+  setText: (text: string) => void;
+  clear: () => void;
+}
+
+const StreamingBubble = forwardRef<StreamingBubbleRef, { styles: any }>((props, ref) => {
+  const [text, setText] = useState('');
+
+  useImperativeHandle(ref, () => ({
+    setText: (newText) => setText(newText),
+    clear: () => setText('')
+  }));
+
+  if (!text) return null;
+
+  return (
+    <View style={[props.styles.msgWrapper, props.styles.msgCoachWrapper]}>
+      <View style={[props.styles.msgBubble, props.styles.msgBubbleCoach]}>
+        <Text style={[props.styles.msgText, props.styles.msgTextCoach]}>
+          {text}
+        </Text>
+      </View>
+    </View>
+  );
+});
+
 export default function ChatScreen() {
   const [scannerCameraVisible, setScannerCameraVisible] = useState(false);
+  const streamingBubbleRef = useRef<StreamingBubbleRef>(null);
 
   const { logMeal, deleteMeal, totals, targets, remaining, meals } = useMeals();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { lang, t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -388,10 +433,14 @@ export default function ChatScreen() {
 
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
-    // Process Response
-    setTimeout(async () => {
-      const parsed = parseChatMessage(textToSend);
-      let coachResponseText = '';
+    const netInfo = await NetInfo.fetch();
+    const isOnline = netInfo.isConnected && netInfo.isInternetReachable !== false;
+
+    const fallbackParse = () => {
+      // Process Response
+      setTimeout(async () => {
+        const parsed = parseChatMessage(textToSend);
+        let coachResponseText = '';
       let nextMascot: MascotState = 'idle';
       let nextStatus: StringKey = 'chat.statusMotivated';
 
@@ -710,6 +759,104 @@ export default function ChatScreen() {
 
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }, 1500);
+    };
+
+    if (isOnline) {
+      const historyRaw = [...messages, userMsg];
+      const chatHistory: ChatMessage[] = historyRaw.slice(-10).map(m => ({
+        role: m.sender === 'user' ? 'user' : 'model',
+        text: m.text
+      }));
+
+      const context: ChatAiContext = {
+        user: user || {},
+        targets: targets ? {
+          calories: targets.calories_target,
+          protein: targets.protein_target,
+          carbs: targets.carbs_target,
+          fat: targets.fat_target
+        } : { calories: 2000, protein: 150, carbs: 200, fat: 65 },
+        totals: totals,
+        meals: meals || []
+      };
+
+      streamChatResponse(
+        chatHistory,
+        context,
+        (partialText) => {
+          setIsTyping(false);
+          const cleanText = partialText.replace(/\[(?:LOG_MEAL|DELETE_MEAL|CHANGE_GOAL):.*?\]/g, '');
+          streamingBubbleRef.current?.setText(cleanText);
+        },
+        async (finalText) => {
+          streamingBubbleRef.current?.clear();
+          const cleanText = finalText.replace(/\[(?:LOG_MEAL|DELETE_MEAL|CHANGE_GOAL):.*?\]/g, '');
+          
+          setMessages((prev) => [...prev, {
+            id: Math.random().toString(),
+            sender: 'coach',
+            text: cleanText,
+            timestamp: new Date(),
+            mascotState: 'idle'
+          }]);
+          
+          const logMatch = finalText.match(/\[LOG_MEAL:\s*(.*?)\s*\]/);
+          const delMatch = finalText.match(/\[DELETE_MEAL:\s*(.*?)\s*\]/);
+          const goalMatch = finalText.match(/\[CHANGE_GOAL:\s*(.*?)\s*\]/);
+          
+          try {
+            if (logMatch) {
+              const data = JSON.parse(logMatch[1]);
+              await logMeal(data.meal_type || 'snack', data.items.map((it: any) => ({
+                type: 'manual',
+                quantity_g: it.grams || 100,
+                food_type: it.name,
+                method: it.method || 'raw'
+              })));
+            }
+            if (delMatch) {
+              const data = JSON.parse(delMatch[1]);
+              const mealType = data.meal_type;
+              const mealToDelete = [...(meals||[])].reverse().find(m => m.meal_type === mealType);
+              if (mealToDelete) {
+                await deleteMeal(mealToDelete.id);
+              }
+            }
+            if (goalMatch) {
+              const data = JSON.parse(goalMatch[1]);
+              if (['lose', 'gain', 'maintain'].includes(data.goal)) {
+                await updateUser({ goal: data.goal });
+              }
+            }
+          } catch(e) {
+            console.error('Failed to parse AI action:', e);
+          }
+          
+          const hour = new Date().getHours();
+          const isLate = hour >= 22 || hour < 5;
+          changeMascotState(isLate ? 'sleeppp' : 'idle', isLate ? 'chat.statusSleepy' : 'chat.statusMotivated');
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        },
+        (err) => {
+          streamingBubbleRef.current?.clear();
+          console.log('Gemini error:', err);
+          setMessages((prev) => [...prev, {
+            id: Math.random().toString(),
+            sender: 'coach',
+            text: "Bawk! My AI brain is a bit scrambled right now. Please try again later!",
+            timestamp: new Date(),
+            mascotState: 'worry'
+          }]);
+          setIsTyping(false);
+          const hour = new Date().getHours();
+          const isLate = hour >= 22 || hour < 5;
+          changeMascotState('worry', isLate ? 'chat.statusSleepy' : 'chat.statusWorried');
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        }
+      );
+    } else {
+      fallbackParse();
+    }
   };
 
   const handleCaptureScanner = async (parsed: ProgressiveNutritionData) => {
@@ -777,22 +924,9 @@ export default function ChatScreen() {
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isCoach = item.sender === 'coach';
-    return (
-      <View style={[styles.msgWrapper, isCoach ? styles.msgCoachWrapper : styles.msgUserWrapper]}>
-
-        <View style={[styles.msgBubble, isCoach ? styles.msgBubbleCoach : styles.msgBubbleUser]}>
-          <Text style={[styles.msgText, isCoach ? styles.msgTextCoach : styles.msgTextUser]}>
-            {item.text}
-          </Text>
-          <Text style={[styles.msgTime, isCoach ? styles.msgTimeCoach : styles.msgTimeUser]}>
-            {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        </View>
-      </View>
-    );
-  };
+  const renderMessage = useCallback(({ item }: { item: Message }) => {
+    return <MessageItem item={item} styles={styles} />;
+  }, [styles]);
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -823,12 +957,15 @@ export default function ChatScreen() {
         contentContainerStyle={styles.chatList}
         showsVerticalScrollIndicator={false}
         ListFooterComponent={
-          isTyping ? (
-            <View style={styles.typingBubble}>
+          <>
+            {isTyping && (
+              <View style={styles.typingBubble}>
                 <ActivityIndicator size="small" color={colors.primary} />
                 <Text style={styles.typingText}>{t('chat.writing')}</Text>
               </View>
-          ) : null
+            )}
+            <StreamingBubble ref={streamingBubbleRef} styles={styles} />
+          </>
         }
       />
 
