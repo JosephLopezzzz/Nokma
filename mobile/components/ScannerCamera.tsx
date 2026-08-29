@@ -123,19 +123,9 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
     return (
       <View style={styles.progressiveContainer}>
         <Text style={styles.progressiveTitle}>Scanning Nutrition...</Text>
-        <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+        <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
           {fields.map(f => (
-            <View key={f.key} style={styles.progressiveRow}>
-              <Text style={styles.progressiveLabel}>{f.label}</Text>
-              {f.data.value !== null ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={styles.progressiveValue}>{f.data.value} {f.data.unit}</Text>
-                  <Ionicons name="checkmark-circle" size={16} color="#4cd964" style={{ marginLeft: 6 }} />
-                </View>
-              ) : (
-                <Text style={styles.progressiveScanning}>Scanning...</Text>
-              )}
-            </View>
+            <ProgressiveField key={f.key} label={f.label} data={f.data} />
           ))}
         </ScrollView>
       </View>
@@ -235,6 +225,43 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
   );
 }
 
+function ProgressiveField({ label, data }: { label: string; data: { value: number | null, unit: string } }) {
+  const isFound = data.value !== null;
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isFound) {
+      Animated.spring(anim, {
+        toValue: 1,
+        friction: 5,
+        tension: 80,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isFound]);
+
+  return (
+    <View style={styles.progressiveRow}>
+      <Text style={styles.progressiveLabel}>{label}</Text>
+      {isFound ? (
+        <Animated.View style={{ 
+          flexDirection: 'row', 
+          alignItems: 'center',
+          opacity: anim,
+          transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }]
+        }}>
+          <Text style={styles.progressiveValue}>{data.value} {data.unit}</Text>
+          <Ionicons name="checkmark-circle" size={18} color="#4cd964" style={{ marginLeft: 6 }} />
+        </Animated.View>
+      ) : (
+        <View style={styles.scanningDotRow}>
+          <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+        </View>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   camera: { flex: 1 },
@@ -266,10 +293,21 @@ const styles = StyleSheet.create({
   btn: { padding: Spacing.md, borderRadius: Radius.md, alignItems: 'center' },
   btnText: { color: 'white', fontWeight: 'bold' },
   closeBtn: { alignItems: 'center', padding: Spacing.sm },
-  progressiveContainer: { width: '100%', backgroundColor: 'rgba(20,20,20,0.85)', borderRadius: Radius.lg, padding: Spacing.lg },
-  progressiveTitle: { color: 'white', fontSize: 16, fontWeight: 'bold', marginBottom: Spacing.md, textAlign: 'center' },
-  progressiveRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.1)' },
-  progressiveLabel: { color: '#ccc', fontSize: 14 },
-  progressiveValue: { color: 'white', fontSize: 14, fontWeight: 'bold' },
+  progressiveContainer: { width: '100%', backgroundColor: 'transparent', paddingHorizontal: Spacing.lg },
+  progressiveTitle: { color: 'white', fontSize: 18, fontWeight: 'bold', marginBottom: Spacing.md, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 4 },
+  progressiveRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    paddingVertical: 12, 
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(30,30,30,0.7)',
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  progressiveLabel: { color: '#E5E7EB', fontSize: 15, fontWeight: '500' },
+  progressiveValue: { color: 'white', fontSize: 16, fontWeight: 'bold' },
   progressiveScanning: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontStyle: 'italic' },
+  scanningDotRow: { flexDirection: 'row', alignItems: 'center' },
 });

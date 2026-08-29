@@ -186,15 +186,14 @@ export default function ProfileScreen() {
       {/* Avatar / header */}
       <View style={styles.avatarSection}>
         <AnimatedPressable style={styles.avatarWrapper} onPress={handlePickImage} scaleTo={0.93}>
-          <View style={styles.avatarGlow} />
           {user.avatar_uri ? (
             <Image
               source={{ uri: user.avatar_uri }}
-              style={[styles.avatarImage, { borderRadius: Radius.lg }]}
+              style={styles.avatarImage}
               resizeMode="cover"
             />
           ) : (
-            <View style={[styles.avatarImage, { alignItems: 'center', justifyContent: 'center', borderRadius: Radius.lg, backgroundColor: colors.bgElevated }]}>
+            <View style={[styles.avatarImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgElevated }]}>
                <Ionicons 
                  name="person" 
                  size={150} 
@@ -202,9 +201,10 @@ export default function ProfileScreen() {
                />
             </View>
           )}
-          {/* Camera badge — always visible so user knows photo is changeable */}
+          {/* Camera badge */}
           <View style={styles.cameraBadge}>
-            <Ionicons name="camera" size={15} color="#fff" />
+            <Ionicons name="camera" size={14} color={colors.textInverse} />
+            <Text style={{ fontSize: 10, color: colors.textInverse, fontWeight: 'bold' }}>Edit</Text>
           </View>
         </AnimatedPressable>
         <Text style={styles.userName}>{user.full_name ?? t('profile.defaultName')}</Text>
@@ -221,7 +221,7 @@ export default function ProfileScreen() {
 
       {/* Daily targets */}
       {user.calories_target && (
-        <View style={styles.card}>
+        <View style={[styles.card, styles.elevatedCard]}>
           <Text style={styles.cardTitle}>{t('profile.dailyTargets')}</Text>
           <View style={styles.macroTargetsRow}>
             <MacroTarget label={t('macro.calories')} unit={t('macro.kcal')}  value={user.calories_target}     color={colors.calories} colors={colors} />
@@ -233,7 +233,7 @@ export default function ProfileScreen() {
       )}
 
       {/* Custom Macros Settings */}
-      <View style={styles.card}>
+      <View style={[styles.card, styles.elevatedCard]}>
         <View style={styles.settingRow}>
           <Text style={styles.cardTitle}>Use Custom Macros</Text>
           <Switch
@@ -293,7 +293,7 @@ export default function ProfileScreen() {
       </View>
 
       {/* Body stats */}
-      <View style={styles.card}>
+      <View style={[styles.card, styles.elevatedCard]}>
         <Text style={styles.cardTitle}>{t('profile.bodyStats')}</Text>
         <StatRow label={t('profile.age')}      value={user.age ? t('profile.ageValue', { age: user.age }) : '—'} colors={colors} />
         <StatRow label={t('profile.sex')}      value={user.sex ? (user.sex === 'male' ? `♂ ${t('profile.male')}` : `♀ ${t('profile.female')}`) : '—'} colors={colors} />
@@ -304,7 +304,7 @@ export default function ProfileScreen() {
       </View>
 
       {/* Health Info card */}
-      <View style={styles.card}>
+      <View style={[styles.card, styles.elevatedCard]}>
         <Text style={styles.cardTitle}>{t('profile.healthInfo')}</Text>
 
         {/* Condition */}
@@ -339,183 +339,170 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Language switcher */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t('profile.language')}</Text>
-        <View style={styles.langRow}>
-          {LANGUAGE_OPTIONS.map((option) => {
-            const active = lang === option.key;
-            return (
-              <AnimatedPressable
-                key={option.key}
-                style={[styles.langBtn, active && styles.langBtnActive]}
-                onPress={() => setLang(option.key)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={t(option.labelKey)}
-                scaleTo={0.95}
-              >
-                <Text style={styles.langFlag}>{option.flag}</Text>
-                <Text style={[styles.langBtnText, active && styles.langBtnTextActive]}>
-                  {t(option.labelKey)}
-                </Text>
-                {active && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
-              </AnimatedPressable>
-            );
-          })}
-        </View>
-        <Text style={styles.langHint}>{t('profile.languageHint')}</Text>
-      </View>
-
-      {/* Theme switcher */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Theme</Text>
-        <View style={styles.langRow}>
-          {[
-            { key: 'light', label: 'Light', icon: 'sunny' },
-            { key: 'dark', label: 'Dark', icon: 'moon' },
-            { key: 'system', label: 'Auto', icon: 'color-palette' },
-          ].map((option) => {
-            const active = theme === option.key;
-            return (
-              <AnimatedPressable
-                key={option.key}
-                style={[styles.langBtn, active && styles.langBtnActive]}
-                onPress={() => setTheme(option.key as any)}
-                scaleTo={0.95}
-              >
-                <Ionicons name={option.icon as any} size={18} color={active ? colors.primary : colors.textSecondary} />
-                <Text style={[styles.langBtnText, active && styles.langBtnTextActive]}>
-                  {option.label}
-                </Text>
-              </AnimatedPressable>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Native Health Sync */}
-      <View style={styles.card}>
-        <View style={styles.settingRow}>
-          <View style={{ flex: 1, paddingRight: Spacing.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-              <Ionicons name="heart" size={18} color="#ef4444" />
-              <Text style={styles.cardTitle}>Health Connect</Text>
-            </View>
-            <Text style={styles.langHint}>
-              Sync logged calories & macros to {healthConfig?.platform || 'Health Connect'} automatically.
-            </Text>
+      {/* Settings Unified Card */}
+      <View style={[styles.card, styles.elevatedCard]}>
+        <Text style={[styles.cardTitle, { marginBottom: Spacing.sm }]}>Settings</Text>
+        
+        {/* Language switcher */}
+        <View style={styles.settingsSection}>
+          <Text style={styles.settingsSubTitle}>{t('profile.language')}</Text>
+          <View style={styles.langRow}>
+            {LANGUAGE_OPTIONS.map((option) => {
+              const active = lang === option.key;
+              return (
+                <AnimatedPressable
+                  key={option.key}
+                  style={[styles.langBtn, active && styles.langBtnActive]}
+                  onPress={() => setLang(option.key)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={t(option.labelKey)}
+                  scaleTo={0.95}
+                >
+                  <Text style={styles.langFlag}>{option.flag}</Text>
+                  <Text style={[styles.langBtnText, active && styles.langBtnTextActive]}>
+                    {t(option.labelKey)}
+                  </Text>
+                  {active && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
+                </AnimatedPressable>
+              );
+            })}
           </View>
-          <Switch
-            value={healthConfig?.enabled ?? false}
-            onValueChange={handleToggleHealthSync}
-            trackColor={{ false: colors.border, true: colors.primary }}
-          />
+          <Text style={styles.langHint}>{t('profile.languageHint')}</Text>
         </View>
 
-        {healthConfig?.enabled && (
-          <View style={{ marginTop: Spacing.md, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: colors.border }}>
-            {/* Permission status */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm }}>
-              <Ionicons
-                name={healthConfig.permissionsGranted ? 'checkmark-circle' : 'alert-circle'}
-                size={16}
-                color={healthConfig.permissionsGranted ? '#10b981' : '#f59e0b'}
-              />
-              <Text style={{ fontSize: FontSize.xs, color: healthConfig.permissionsGranted ? '#10b981' : '#f59e0b' }}>
-                {healthConfig.permissionsGranted ? 'Permissions granted' : 'Permissions needed'}
-              </Text>
-            </View>
+        <View style={styles.settingsDivider} />
 
-            {/* Read data from Health Connect */}
-            {healthConfig.permissionsGranted && (healthData.steps !== null || healthData.weight !== null) && (
-              <View style={{ flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.sm }}>
-                {healthData.steps !== null && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="footsteps-outline" size={14} color={colors.textSecondary} />
-                    <Text style={{ fontSize: FontSize.xs, color: colors.textSecondary }}>
-                      {healthData.steps.toLocaleString()} steps today
-                    </Text>
-                  </View>
-                )}
-                {healthData.weight !== null && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="scale-outline" size={14} color={colors.textSecondary} />
-                    <Text style={{ fontSize: FontSize.xs, color: colors.textSecondary }}>
-                      {healthData.weight.toFixed(1)} kg
-                    </Text>
-                  </View>
-                )}
+        {/* Theme switcher */}
+        <View style={styles.settingsSection}>
+          <Text style={styles.settingsSubTitle}>Theme</Text>
+          <View style={styles.langRow}>
+            {[
+              { key: 'light', label: 'Light', icon: 'sunny' },
+              { key: 'dark', label: 'Dark', icon: 'moon' },
+              { key: 'system', label: 'Auto', icon: 'color-palette' },
+            ].map((option) => {
+              const active = theme === option.key;
+              return (
+                <AnimatedPressable
+                  key={option.key}
+                  style={[styles.langBtn, active && styles.langBtnActive]}
+                  onPress={() => setTheme(option.key as any)}
+                  scaleTo={0.95}
+                >
+                  <Ionicons name={option.icon as any} size={18} color={active ? colors.primary : colors.textSecondary} />
+                  <Text style={[styles.langBtnText, active && styles.langBtnTextActive]}>
+                    {option.label}
+                  </Text>
+                </AnimatedPressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.settingsDivider} />
+
+        {/* Native Health Sync */}
+        <View style={styles.settingsSection}>
+          <View style={styles.settingRow}>
+            <View style={{ flex: 1, paddingRight: Spacing.sm }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+                <Ionicons name="heart" size={18} color="#ef4444" />
+                <Text style={styles.settingsSubTitle}>Health Connect</Text>
               </View>
-            )}
-
-            {/* Sync controls */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: FontSize.xs, color: colors.textMuted }}>
-                Last Synced: {healthConfig.lastSyncedAt ? new Date(healthConfig.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
+              <Text style={styles.langHint}>
+                Sync logged calories & macros to {healthConfig?.platform || 'Health Connect'} automatically.
               </Text>
-              <AnimatedPressable
-                style={{ backgroundColor: colors.primaryGlow, paddingHorizontal: Spacing.md, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary }}
-                onPress={handleManualHealthSync}
-              >
-                <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: colors.primary }}>
-                  {syncingHealth ? 'Syncing...' : 'Sync Now'}
-                </Text>
-              </AnimatedPressable>
             </View>
+            <Switch
+              value={healthConfig?.enabled ?? false}
+              onValueChange={handleToggleHealthSync}
+              trackColor={{ false: colors.border, true: colors.primary }}
+            />
           </View>
-        )}
-      </View>
 
+          {healthConfig?.enabled && (
+            <View style={{ marginTop: Spacing.md, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: colors.border }}>
+              {/* Permission status */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm }}>
+                <Ionicons
+                  name={healthConfig.permissionsGranted ? 'checkmark-circle' : 'alert-circle'}
+                  size={16}
+                  color={healthConfig.permissionsGranted ? '#10b981' : '#f59e0b'}
+                />
+                <Text style={{ fontSize: FontSize.xs, color: healthConfig.permissionsGranted ? '#10b981' : '#f59e0b' }}>
+                  {healthConfig.permissionsGranted ? 'Permissions granted' : 'Permissions needed'}
+                </Text>
+              </View>
 
-      {/* BMI snapshot */}
-      {user.height_cm && user.weight_kg && (
-        <View style={styles.bmiCard}>
-          {(() => {
-            const bmi = user.weight_kg / ((user.height_cm / 100) ** 2);
-            const cat = bmi < 18.5
-              ? t('profile.bmiUnderweight')
-              : bmi < 25 ? t('profile.bmiNormal')
-              : bmi < 30 ? t('profile.bmiOverweight')
-              : t('profile.bmiObese');
-            const col = bmi < 18.5 ? colors.info : bmi < 25 ? colors.success : colors.warning;
-            return (
-              <>
-                <Text style={styles.bmiLabel}>{t('profile.bmi')}</Text>
-                <Text style={[styles.bmiValue, { color: col }]}>{bmi.toFixed(1)}</Text>
-                <Text style={[styles.bmiCat, { color: col }]}>{cat}</Text>
-              </>
-            );
-          })()}
+              {/* Read data from Health Connect */}
+              {healthConfig.permissionsGranted && (healthData.steps !== null || healthData.weight !== null) && (
+                <View style={{ flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.sm }}>
+                  {healthData.steps !== null && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons name="footsteps-outline" size={14} color={colors.textSecondary} />
+                      <Text style={{ fontSize: FontSize.xs, color: colors.textSecondary }}>
+                        {healthData.steps.toLocaleString()} steps today
+                      </Text>
+                    </View>
+                  )}
+                  {healthData.weight !== null && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons name="scale-outline" size={14} color={colors.textSecondary} />
+                      <Text style={{ fontSize: FontSize.xs, color: colors.textSecondary }}>
+                        {healthData.weight.toFixed(1)} kg
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Sync controls */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: FontSize.xs, color: colors.textMuted }}>
+                  Last Synced: {healthConfig.lastSyncedAt ? new Date(healthConfig.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
+                </Text>
+                <AnimatedPressable
+                  style={{ backgroundColor: colors.primaryGlow, paddingHorizontal: Spacing.md, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary }}
+                  onPress={handleManualHealthSync}
+                >
+                  <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: colors.primary }}>
+                    {syncingHealth ? 'Syncing...' : 'Sync Now'}
+                  </Text>
+                </AnimatedPressable>
+              </View>
+            </View>
+          )}
         </View>
-      )}
 
-      {/* Replay Tutorial */}
-      <AnimatedPressable
-        style={styles.replayBtn}
-        onPress={() => {
-          resetTutorial();
-          if (Platform.OS === 'web') {
-            window.alert(t('profile.tutorialResetBody'));
-          } else {
-            Alert.alert(t('profile.tutorialReset'), t('profile.tutorialResetBody'));
-          }
-        }}
-        scaleTo={0.96}
-      >
-        <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-        <Text style={styles.replayBtnText}>{t('profile.replayTutorial')}</Text>
-      </AnimatedPressable>
+        <View style={styles.settingsDivider} />
 
-      {/* Reset */}
-      <AnimatedPressable style={styles.logoutBtn} onPress={handleReset} disabled={resetting} scaleTo={0.96}>
-        {resetting
-          ? <ActivityIndicator color={colors.error} />
-          : <>
-              <Ionicons name="trash-outline" size={20} color={colors.error} />
-              <Text style={styles.logoutText}>{t('profile.resetProgress')}</Text>
-            </>}
-      </AnimatedPressable>
+        {/* Actions */}
+        <AnimatedPressable
+          style={styles.replayBtn}
+          onPress={() => {
+            resetTutorial();
+            if (Platform.OS === 'web') {
+              window.alert(t('profile.tutorialResetBody'));
+            } else {
+              Alert.alert(t('profile.tutorialReset'), t('profile.tutorialResetBody'));
+            }
+          }}
+          scaleTo={0.96}
+        >
+          <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
+          <Text style={styles.replayBtnText}>{t('profile.replayTutorial')}</Text>
+        </AnimatedPressable>
+
+        <AnimatedPressable style={styles.logoutBtn} onPress={handleReset} disabled={resetting} scaleTo={0.96}>
+          {resetting
+            ? <ActivityIndicator color={colors.error} />
+            : <>
+                <Ionicons name="trash-outline" size={20} color={colors.error} />
+                <Text style={styles.logoutText}>{t('profile.resetProgress')}</Text>
+              </>}
+        </AnimatedPressable>
+      </View>
 
 
       <Text style={styles.version}>{t('profile.version')}</Text>
@@ -526,28 +513,25 @@ export default function ProfileScreen() {
 const getStyles = (colors: ThemeColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   content: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: 40 },
-  avatarSection: { alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+  avatarSection: { alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.lg },
   avatarWrapper: {
-    width: 200, height: 200,
+    width: 140, height: 140,
     alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1, shadowRadius: 10, elevation: 4,
   },
-  avatarGlow: {
-    position: 'absolute',
-    width: 206, height: 206, borderRadius: Radius.lg + 3,
-    backgroundColor: colors.primaryGlow,
-    borderWidth: 3, borderColor: colors.primary,
-  },
-  avatarImage: { width: 200, height: 200 },
+  avatarImage: { width: 140, height: 140, borderRadius: 70, backgroundColor: colors.bgElevated },
   cameraBadge: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(40,40,40,0.75)',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
     borderWidth: 2,
     borderColor: colors.bg,
   },
@@ -635,4 +619,15 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.textPrimary,
     marginTop: 4,
   },
+  settingsSection: { paddingVertical: Spacing.sm },
+  settingsSubTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: colors.textPrimary, marginBottom: Spacing.sm },
+  settingsDivider: { height: 1, backgroundColor: colors.border, marginVertical: Spacing.sm },
+  elevatedCard: {
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
+    borderWidth: 0,
+  }
 });

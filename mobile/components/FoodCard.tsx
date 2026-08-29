@@ -78,7 +78,7 @@ export default function FoodCard({ item, onPress, onAdd, compact = false, allerg
   }
 
   return (
-    <AnimatedPressable onPress={onPress} style={styles.card}>
+    <AnimatedPressable onPress={onPress} style={styles.card} scaleTo={0.98}>
       <View style={styles.top}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>{name}</Text>

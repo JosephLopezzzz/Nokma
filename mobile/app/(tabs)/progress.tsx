@@ -6,7 +6,11 @@ import { ThemeColors, FontSize, FontWeight, Spacing, Radius } from '../../consta
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import { mealsApi } from '../../services/api';
 import { useMeals } from '../../context/MealContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { Image as ExpoImage } from 'expo-image';
+import MealSection from '../../components/MealSection';
 import { useStreak } from '../../hooks/useStreak';
 import {
   getQualityColor, getLevelGradient, getLevelEmoji,
@@ -21,8 +25,10 @@ type Timeframe = 7 | 14 | 30;
 export default function ProgressScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const { totals, targets } = useMeals();
+  const { t } = useLanguage();
+  const { meals, totals, targets, deleteMeal } = useMeals();
   const styles = useMemo(() => getStyles(colors), [colors]);
+  const [activeTab, setActiveTab] = useState<'diary' | 'charts'>('diary');
   const { streakInfo, isLoading: streakLoading } = useStreak(totals.calories, targets, totals);
 
   // ── Calendar navigation ───────────────────────────────────────────────────
@@ -207,24 +213,96 @@ export default function ProgressScreen() {
     <View style={styles.root}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
-        <View style={styles.headerTop}>
-          <Text style={styles.title}>Progress & Analytics</Text>
-          <View style={styles.timeframeChips}>
-            {([7, 14, 30] as Timeframe[]).map((tf) => {
-              const active = timeframe === tf;
-              return (
-                <Pressable
-                  key={tf}
-                  style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => setTimeframe(tf)}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{tf}D</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+        <View style={styles.segmentedControl}>
+          <Pressable
+            style={[styles.segmentBtn, activeTab === 'diary' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('diary')}
+          >
+            <Text style={[styles.segmentText, activeTab === 'diary' && styles.segmentTextActive]}>
+              {t('dash.todaysMeals') || 'Diary'}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segmentBtn, activeTab === 'charts' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('charts')}
+          >
+            <Text style={[styles.segmentText, activeTab === 'charts' && styles.segmentTextActive]}>
+              Charts
+            </Text>
+          </Pressable>
         </View>
+
+        {activeTab === 'charts' && (
+          <View style={[styles.headerTop, { marginTop: Spacing.md }]}>
+            <Text style={styles.title}>Progress & Analytics</Text>
+            <View style={styles.timeframeChips}>
+              {([7, 14, 30] as Timeframe[]).map((tf) => {
+                const active = timeframe === tf;
+                return (
+                  <Pressable
+                    key={tf}
+                    style={[styles.chip, active && styles.chipActive]}
+                    onPress={() => setTimeframe(tf)}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{tf}D</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </View>
+
+      {activeTab === 'diary' ? (
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { padding: Spacing.lg }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {meals.length === 0 ? (
+            <View style={styles.emptyMeals}>
+              <ExpoImage
+                source={require('../../assets/mascot/idle.gif')}
+                style={styles.emptyMascot}
+                contentFit="contain"
+                priority="low"
+              />
+              <Text style={styles.emptyTitle}>
+                {new Date().getHours() < 12
+                  ? t('dash.goodMorning')
+                  : new Date().getHours() < 18
+                    ? t('dash.goodAfternoon')
+                    : t('dash.goodEvening')}
+              </Text>
+              <Text style={styles.emptySubText}>{t('dash.emptyMeals')}</Text>
+              <Pressable
+                style={styles.emptyCta}
+                onPress={() => router.push('/(tabs)/log')}
+              >
+                <Ionicons
+                  name="add-circle-outline"
+                  size={18}
+                  color={colors.textInverse}
+                />
+                <Text style={styles.emptyCtaText}>{t('dash.logAMeal')}</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.diaryList}>
+              <Pressable
+                onPress={() => router.push('/(tabs)/log')}
+                style={styles.addMealBtn}
+              >
+                <Ionicons name="add" size={16} color={colors.primary} />
+                <Text style={styles.addMealText}>{t('dash.add')}</Text>
+              </Pressable>
+              
+              {meals.map((meal) => (
+                <MealSection key={meal.id} meal={meal} onDelete={deleteMeal} />
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      ) : (
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -363,6 +441,7 @@ export default function ProgressScreen() {
           </View>
         </View>
       </ScrollView>
+      )}
     </View>
   );
 }
@@ -609,6 +688,34 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: colors.bgElevated,
+    borderRadius: Radius.full,
+    padding: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: Radius.full,
+  },
+  segmentBtnActive: {
+    backgroundColor: colors.bgCard,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: FontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: FontWeight.semibold,
+  },
+  segmentTextActive: {
+    color: colors.primary,
   },
   headerTop: {
     flexDirection: 'row',
@@ -993,5 +1100,71 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: FontSize.xs,
     color: colors.textMuted,
     fontWeight: FontWeight.medium,
+  },
+  emptyMeals: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: Spacing.xl,
+    backgroundColor: colors.bgCard,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    marginTop: Spacing.xl,
+  },
+  emptyMascot: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: colors.textPrimary,
+  },
+  emptySubText: {
+    fontSize: FontSize.sm,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.lg,
+    lineHeight: 20,
+  },
+  emptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: Radius.full,
+    marginTop: 4,
+  },
+  emptyCtaText: {
+    fontSize: FontSize.sm,
+    color: colors.textInverse,
+    fontWeight: FontWeight.semibold,
+  },
+  diaryList: {
+    gap: Spacing.md,
+    paddingBottom: 40,
+  },
+  addMealBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    backgroundColor: colors.primaryGlow,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    marginBottom: Spacing.sm,
+  },
+  addMealText: {
+    fontSize: FontSize.sm,
+    color: colors.primary,
+    fontWeight: FontWeight.semibold,
   },
 });

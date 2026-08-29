@@ -126,6 +126,36 @@ const MessageItem = React.memo(({ item, styles, user }: { item: Message, styles:
   );
 }, (prev, next) => prev.item.text === next.item.text && prev.item.id === next.item.id && prev.user?.avatar_uri === next.user?.avatar_uri);
 
+const TypingIndicator = ({ colors }: { colors: ThemeColors }) => {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animateDot = (anim: Animated.Value, delay: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, { toValue: -6, duration: 250, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0, duration: 250, useNativeDriver: true }),
+          Animated.delay(400)
+        ])
+      ).start();
+    };
+    animateDot(dot1, 0);
+    animateDot(dot2, 150);
+    animateDot(dot3, 300);
+  }, [dot1, dot2, dot3]);
+
+  return (
+    <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+      <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }, { transform: [{ translateY: dot1 }] }]} />
+      <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }, { transform: [{ translateY: dot2 }] }]} />
+      <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }, { transform: [{ translateY: dot3 }] }]} />
+    </View>
+  );
+};
+
 export interface StreamingBubbleRef {
   setText: (text: string) => void;
   clear: () => void;
@@ -1003,7 +1033,7 @@ export default function ChatScreen() {
           <>
             {isTyping && (
               <View style={styles.typingBubble}>
-                <ActivityIndicator size="small" color={colors.primary} />
+                <TypingIndicator colors={colors} />
                 <Text style={styles.typingText}>{t('chat.writing')}</Text>
               </View>
             )}
@@ -1167,10 +1197,10 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: 4,
   },
   msgBubbleCoach: {
-    backgroundColor: colors.bgCard,
+    backgroundColor: colors.primaryGlow,
     borderTopLeftRadius: 2,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.primary + '30',
   },
   msgBubbleUser: {
     backgroundColor: colors.primary,
@@ -1246,21 +1276,24 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.bgCard,
-    gap: 8,
+    backgroundColor: colors.bg,
+    paddingBottom: Spacing.md,
   },
   input: {
     flex: 1,
-    height: 44,
-    backgroundColor: colors.bgInput,
+    height: 48,
+    backgroundColor: colors.bgCard,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.lg,
     color: colors.textPrimary,
     fontSize: FontSize.md,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
   },
   sendBtn: {
     width: 44,

@@ -299,41 +299,51 @@ export default function SearchScreen() {
       <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
         <Text style={styles.title}>{t('search.title')}</Text>
         <View style={styles.searchRow}>
-          <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+          <Ionicons name="search" size={22} color={colors.textSecondary} />
           <TextInput
             style={styles.input}
-            placeholder={activeTab === 'foods' ? t('search.phFoods') : t('search.phRestaurant')}
+            placeholder={t('search.placeholder')}
             placeholderTextColor={colors.textMuted}
             value={query}
-            onChangeText={(q) => { setQuery(q); search(q); }}
-            returnKeyType="search"
-            onSubmitEditing={() => search(query)}
+            onChangeText={(text) => {
+              setQuery(text);
+              search(text);
+            }}
           />
           {query.length > 0 && (
-            <Pressable onPress={() => { setQuery(''); clearResults(); search(''); }} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            <Pressable onPress={() => { setQuery(''); search(''); }} hitSlop={15}>
+              <Ionicons name="close-circle" size={22} color={colors.textMuted} />
             </Pressable>
           )}
         </View>
 
-        {/* Tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll}>
-          {TABS.map((tab) => (
-            <AnimatedPressable
-              key={tab.key}
-              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-              onPress={() => setActiveTab(tab.key)}
-              scaleTo={0.95}
-            >
-              <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-                {t(tab.labelKey)}
-              </Text>
-            </AnimatedPressable>
-          ))}
-        </ScrollView>
+        {/* Segmented Control Tabs */}
+        <View style={styles.tabsContainer}>
+          <AnimatedPressable
+            style={[styles.tabSegment, activeTab === 'foods' && styles.tabSegmentActive]}
+            onPress={() => setActiveTab('foods')}
+            scaleTo={0.97}
+          >
+            <Ionicons name="nutrition-outline" size={16} color={activeTab === 'foods' ? colors.primary : colors.textSecondary} />
+            <Text style={[styles.tabSegmentText, activeTab === 'foods' && styles.tabSegmentTextActive]}>
+              {t('search.tabFoods')}
+            </Text>
+          </AnimatedPressable>
+          
+          <AnimatedPressable
+            style={[styles.tabSegment, activeTab === 'restaurant' && styles.tabSegmentActive]}
+            onPress={() => setActiveTab('restaurant')}
+            scaleTo={0.97}
+          >
+            <Ionicons name="fast-food-outline" size={16} color={activeTab === 'restaurant' ? colors.primary : colors.textSecondary} />
+            <Text style={[styles.tabSegmentText, activeTab === 'restaurant' && styles.tabSegmentTextActive]}>
+              {t('search.tabRestaurant')}
+            </Text>
+          </AnimatedPressable>
+        </View>
       </View>
 
-      {/* Action Buttons */}
+      {/* Action Row */}
       <View style={styles.actionRow}>
         {activeTab === 'restaurant' ? (
           <View style={styles.actionRow}>
@@ -586,31 +596,49 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.bgInput,
-    borderRadius: Radius.md,
+    backgroundColor: colors.bgCard,
+    borderRadius: Radius.full,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: Spacing.md,
-    height: 48,
-    gap: 8,
+    paddingHorizontal: Spacing.lg,
+    height: 56,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 4,
   },
   input: { flex: 1, color: colors.textPrimary, fontSize: FontSize.md },
-  tabScroll: { flexGrow: 0 },
-  tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: Radius.full,
-    marginRight: 8,
+  
+  // Segmented Control Tabs
+  tabsContainer: {
+    flexDirection: 'row',
     backgroundColor: colors.bgElevated,
+    borderRadius: Radius.lg,
+    padding: 4,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  tabActive: {
-    backgroundColor: colors.primaryGlow,
-    borderColor: colors.primary,
+  tabSegment: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: Radius.md,
+    gap: 6,
   },
-  tabText: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.medium },
-  tabTextActive: { color: colors.primary, fontWeight: FontWeight.bold },
+  tabSegmentActive: {
+    backgroundColor: colors.bgCard,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabSegmentText: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.medium },
+  tabSegmentTextActive: { color: colors.primary, fontWeight: FontWeight.bold },
   
   actionRow: { flexDirection: 'row', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryGlow, paddingVertical: 10, borderRadius: Radius.md, gap: 6, borderWidth: 1, borderColor: colors.primary },

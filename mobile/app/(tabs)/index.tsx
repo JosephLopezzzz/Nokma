@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  RefreshControl, Animated, TouchableOpacity,
+  RefreshControl, Animated, TouchableOpacity, Dimensions
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
@@ -12,7 +12,6 @@ import Svg, { Circle } from 'react-native-svg';
 import { useMeals } from '../../context/MealContext';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import MealSection from '../../components/MealSection';
 import CoachGuide from '../../components/CoachGuide';
 import DashboardTutorial, {
   isTutorialComplete,
@@ -105,7 +104,7 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const styles = React.useMemo(() => getStyles(colors), [colors]);
-  const { meals, totals, targets, remaining, isLoading, loadToday, deleteMeal } = useMeals();
+  const { meals, totals, targets, remaining, isLoading, loadToday } = useMeals();
   const { streakInfo, refresh: refreshStreak } = useStreak(totals.calories, targets);
   const [showTutorial, setShowTutorial] = useState(false);
   const [confirmationMsg, setConfirmationMsg] = useState<string | null>(null);
@@ -226,17 +225,6 @@ export default function DashboardScreen() {
           <View style={styles.header}>
             {/* NOKMA brand title */}
             <Text style={styles.nokmaTitle}>NOKMA</Text>
-            {/* Streak chip */}
-            <TouchableOpacity
-              style={styles.streakChip}
-              onPress={() => router.push('/(tabs)/progress')}
-              activeOpacity={0.8}
-            >
-              <Animated.Text style={[styles.streakChipEmoji, { transform: [{ scale: streakPulse }] }]}>
-                {getLevelEmoji(streakInfo.currentLevel)}
-              </Animated.Text>
-              <Text style={styles.streakChipCount}>{streakInfo.currentStreak}</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Coach Guide — mascot + speech bubble with greeting + date inside */}
@@ -266,47 +254,24 @@ export default function DashboardScreen() {
 
         {/* Layered White Content Card */}
         <View style={styles.contentCard}>
-          {/* Calorie Ring + Macro bars */}
-          <View ref={trackerRef}>
+          {/* Top Row: Calorie Ring & Quick Actions */}
+          <View ref={trackerRef} style={styles.topDashboardRow}>
             <View style={styles.ringCard}>
-              <CalorieRing consumed={totals.calories} target={caloriesTarget} />
+              <CalorieRing consumed={totals.calories} target={caloriesTarget} size={150} />
             </View>
-
-            {/* 7-day mini streak heatmap */}
-            {streakInfo.weekHeatmap.length > 0 && (
-              <View style={styles.miniHeatmapRow}>
-                {streakInfo.weekHeatmap.map((entry, idx) => {
-                  const dotColor = getQualityColor(entry.quality);
-                  const isToday = idx === streakInfo.weekHeatmap.length - 1;
-                  const dayLabels = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-                  const dayObj = new Date(entry.date + 'T00:00:00');
-                  const dayLabel = dayLabels[dayObj.getDay()];
-                  return (
-                    <View key={entry.date} style={styles.miniHeatmapCell}>
-                      <Text style={[
-                        styles.miniHeatmapDayLabel,
-                        isToday && { color: colors.primary, fontWeight: FontWeight.bold },
-                      ]}>{dayLabel}</Text>
-                      <View style={[
-                        styles.miniHeatmapDot,
-                        {
-                          backgroundColor: entry.quality > 0 ? dotColor : 'transparent',
-                          borderColor: entry.quality > 0 ? dotColor : colors.border,
-                          borderWidth: 1.5,
-                        },
-                        isToday && { borderColor: colors.primary, borderWidth: 2 },
-                      ]}>
-                        {entry.quality >= 2 && (
-                          <Text style={styles.miniHeatmapEmoji}>
-                            {entry.quality === 3 ? '🔥' : '🟠'}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })}
+            <View style={styles.quickActionsCol}>
+              <View ref={fabRef}>
+                <Pressable style={styles.quickActionBtn} onPress={() => router.push('/(tabs)/log')}>
+                  <Ionicons name="restaurant" size={20} color={colors.primary} />
+                  <Text style={styles.quickActionText}>{t('dash.logAMeal')}</Text>
+                </Pressable>
               </View>
-            )}
+              <Pressable style={styles.quickActionBtn} onPress={() => router.push('/(tabs)/search')}>
+                <Ionicons name="search" size={20} color={colors.primary} />
+                <Text style={styles.quickActionText}>{t('search.title')}</Text>
+              </Pressable>
+            </View>
+          </View>
 
             {/* Steps KPI */}
             {dailySteps > 0 && (
@@ -379,57 +344,74 @@ export default function DashboardScreen() {
                 </Text>
               </View>
             </View>
-          </View>
 
-          {/* Today's meals */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{t('dash.todaysMeals')}</Text>
-              <View ref={fabRef}>
-                <Pressable
-                  onPress={() => router.push('/(tabs)/log')}
-                  style={styles.addMealBtn}
-                >
-                  <Ionicons name="add" size={16} color={colors.primary} />
-                  <Text style={styles.addMealText}>{t('dash.add')}</Text>
-                </Pressable>
+            {/* Streak Dashboard Widget */}
+            <Pressable onPress={() => router.push('/(tabs)/progress')}>
+              <View
+                style={[
+                  styles.streakWidgetCard,
+                  {
+                    backgroundColor: streakInfo.levelName === 'Inferno' ? '#FF4B2B' :
+                                     streakInfo.levelName === 'Ignite'  ? '#f12711' :
+                                     streakInfo.levelName === 'Blaze'   ? '#FF512F' :
+                                     streakInfo.levelName === 'Glow'    ? '#FF8008' :
+                                     '#E2E8F0' // Spark or none
+                  }
+                ]}
+              >
+                <View style={styles.streakWidgetRow}>
+                  <View style={styles.streakWidgetInfo}>
+                    <Text style={[styles.streakWidgetTitle, streakInfo.levelName === 'Spark' && {color: '#1E293B'}]}>
+                      {streakInfo.currentStreak} Day Streak
+                    </Text>
+                    <Text style={[styles.streakWidgetSubtitle, streakInfo.levelName === 'Spark' && {color: '#475569'}]}>
+                      {streakInfo.levelName} Level
+                    </Text>
+                  </View>
+                  <Animated.Text style={[styles.streakWidgetEmoji, { transform: [{ scale: streakPulse }] }]}>
+                    {getLevelEmoji(streakInfo.levelName)}
+                  </Animated.Text>
+                </View>
+                
+                {streakInfo.weekHeatmap.length > 0 && (
+                  <View style={styles.streakWidgetHeatmapRow}>
+                    {streakInfo.weekHeatmap.map((entry, idx) => {
+                      const dotColor = getQualityColor(entry.quality);
+                      const isToday = idx === streakInfo.weekHeatmap.length - 1;
+                      const dayLabels = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+                      const dayObj = new Date(entry.date + 'T00:00:00');
+                      const dayLabel = dayLabels[dayObj.getDay()];
+                      return (
+                        <View key={entry.date} style={styles.miniHeatmapCell}>
+                          <Text style={[
+                            styles.streakWidgetDayLabel,
+                            streakInfo.levelName === 'Spark' && {color: '#475569'},
+                            isToday && { fontWeight: FontWeight.bold },
+                          ]}>{dayLabel}</Text>
+                          <View style={[
+                            styles.streakWidgetDot,
+                            {
+                              backgroundColor: entry.quality > 0 ? dotColor : 'rgba(255,255,255,0.2)',
+                              borderColor: entry.quality > 0 ? dotColor : 'rgba(255,255,255,0.4)',
+                            },
+                            streakInfo.levelName === 'Spark' && entry.quality === 0 && {
+                              backgroundColor: 'rgba(0,0,0,0.05)', borderColor: 'rgba(0,0,0,0.1)'
+                            },
+                            isToday && { borderColor: streakInfo.levelName === 'Spark' ? '#0F172A' : '#FFF', borderWidth: 2 },
+                          ]}>
+                            {entry.quality >= 2 && (
+                              <Text style={styles.miniHeatmapEmoji}>
+                                {entry.quality === 3 ? '🎯' : '👍'}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
-            </View>
-
-            {meals.length === 0 ? (
-              <View style={styles.emptyMeals}>
-                <ExpoImage
-                  source={require('../../assets/mascot/idle.gif')}
-                  style={styles.emptyMascot}
-                  contentFit="contain"
-                  priority="low"
-                />
-                <Text style={styles.emptyTitle}>
-                  {new Date().getHours() < 12
-                    ? t('dash.goodMorning')
-                    : new Date().getHours() < 18
-                      ? t('dash.goodAfternoon')
-                      : t('dash.goodEvening')}
-                </Text>
-                <Text style={styles.emptySubText}>{t('dash.emptyMeals')}</Text>
-                <Pressable
-                  style={styles.emptyCta}
-                  onPress={() => router.push('/(tabs)/log')}
-                >
-                  <Ionicons
-                    name="add-circle-outline"
-                    size={18}
-                    color={colors.textInverse}
-                  />
-                  <Text style={styles.emptyCtaText}>{t('dash.logAMeal')}</Text>
-                </Pressable>
-              </View>
-            ) : (
-              meals.map((meal) => (
-                <MealSection key={meal.id} meal={meal} onDelete={deleteMeal} />
-              ))
-            )}
-          </View>
+            </Pressable>
           </View>
         </View>
       </ScrollView>
@@ -447,26 +429,6 @@ export default function DashboardScreen() {
 
 const getStyles = (colors: ThemeColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  // ── Streak chip (header) ──────────────────────────────────────────────────
-  streakChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(232,162,84,0.18)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radius.full,
-    borderWidth: 1.5,
-    borderColor: '#E8A254',
-  },
-  streakChipEmoji: {
-    fontSize: 18,
-  },
-  streakChipCount: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.extrabold,
-    color: '#E8A254',
-  },
   // ── 7-day mini heatmap ────────────────────────────────────────────────────
   miniHeatmapRow: {
     flexDirection: 'row',
@@ -495,6 +457,64 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   miniHeatmapEmoji: {
     fontSize: 14,
+  },
+  streakWidgetCard: {
+    borderRadius: 20,
+    padding: Spacing.lg,
+    marginVertical: Spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  streakWidgetRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  streakWidgetInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  streakWidgetTitle: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.extrabold,
+    color: '#FFF',
+  },
+  streakWidgetSubtitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: 'rgba(255,255,255,0.9)',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  streakWidgetEmoji: {
+    fontSize: 42,
+  },
+  streakWidgetHeatmapRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: Spacing.md,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  streakWidgetDayLabel: {
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: FontWeight.medium,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  streakWidgetDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   bgImage: {
     position: 'absolute',
@@ -575,6 +595,31 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: FontWeight.semibold,
     marginTop: 2,
   },
+  topDashboardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  quickActionsCol: {
+    flex: 1,
+    gap: Spacing.sm,
+  },
+  quickActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.primaryGlow,
+    paddingVertical: 12,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(232,162,84,0.3)',
+  },
+  quickActionText: {
+    fontSize: FontSize.sm,
+    color: colors.primary,
+    fontWeight: FontWeight.bold,
+  },
   stepsCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -603,10 +648,10 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   macroTrio: {
     backgroundColor: colors.bgCard,
     borderRadius: Radius.lg,
-    padding: Spacing.md,
+    padding: Spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 12,
+    gap: 8,
   },
   slimMacroRow: {
     flexDirection: 'row',
@@ -633,78 +678,5 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   slimVal: {
     fontWeight: FontWeight.bold,
     color: colors.textPrimary,
-  },
-  section: {
-    marginTop: Spacing.sm,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  sectionTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: colors.textPrimary,
-  },
-  addMealBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.primaryGlow,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  addMealText: {
-    fontSize: FontSize.sm,
-    color: colors.primary,
-    fontWeight: FontWeight.semibold,
-  },
-  emptyMeals: {
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: Spacing.xl,
-    backgroundColor: colors.bgCard,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-  },
-  emptyMascot: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 4,
-  },
-  emptyTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: colors.textPrimary,
-  },
-  emptySubText: {
-    fontSize: FontSize.sm,
-    color: colors.textMuted,
-    textAlign: 'center',
-    paddingHorizontal: Spacing.lg,
-    lineHeight: 20,
-  },
-  emptyCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: Radius.full,
-    marginTop: 4,
-  },
-  emptyCtaText: {
-    fontSize: FontSize.sm,
-    color: colors.textInverse,
-    fontWeight: FontWeight.semibold,
   },
 });
