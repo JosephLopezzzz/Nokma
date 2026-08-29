@@ -33,8 +33,8 @@ export function streamChatResponse(
 
   const loggedMealsStr = context.meals.length > 0
     ? context.meals.map(m => {
-        const items = m.items.map((i: any) => `${i.name} (${i.quantity_g}g)`).join(', ');
-        return `- ${m.meal_type.toUpperCase()}: ${items} (${Math.round(m.total_calories || 0)} kcal)`;
+        const items = m.items.map((i: any) => `${i.food_name || i.name || 'Unknown food'} (${i.quantity_g}g)`).join(', ');
+        return `- ${m.meal_type.toUpperCase()}: ${items}`;
       }).join('\n')
     : 'None yet.';
 
