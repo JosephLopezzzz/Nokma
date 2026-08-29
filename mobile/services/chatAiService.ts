@@ -59,14 +59,17 @@ ${loggedMealsStr}
 
 INSTRUCTIONS:
 1. Answer the user's questions about their nutrition, meals, or recommendations based on their exact context above.
-2. If the user mentions eating something and asks to log it, or you suggest a meal and they agree, you MUST append a special hidden JSON tag at the VERY END of your response to trigger the app's internal logic.
-3. If the user asks to delete a meal, append a DELETE_MEAL tag.
-4. If the user asks to change their goal (to lose, gain, or maintain), append a CHANGE_GOAL tag.
+2. FORMATTING RULES: Keep your responses clean and easy to read. DO NOT use asterisks for bold or italics (no **bold** or *italic*). DO NOT use markdown headers like ###. Use simple bullet points (-) for lists. Use a single column, plain text layout. Keep the tone conversational but formatting minimal.
+3. If the user mentions eating something and asks to log it, or you suggest a meal and they agree, you MUST append a special hidden JSON tag at the VERY END of your response to trigger the app's internal logic.
+4. If the user asks to delete a meal, append a DELETE_MEAL tag.
+5. If the user asks to change their goal (to lose, gain, or maintain), append a CHANGE_GOAL tag.
+6. If the user shares new profile information (e.g., they lost weight, grew taller, or changed activity level), append an UPDATE_PROFILE tag with the updated fields.
 
 ACTION TAGS FORMAT (ONLY USE IF TAKING AN ACTION, MUST BE AT THE VERY END OF YOUR RESPONSE):
 To log a meal: [LOG_MEAL: {"items": [{"name": "chicken", "grams": 200, "method": "grilled"}], "meal_type": "lunch"}]
 To delete a meal (valid types: breakfast, lunch, dinner, snack): [DELETE_MEAL: {"meal_type": "breakfast"}]
 To change a goal (valid goals: lose, gain, maintain): [CHANGE_GOAL: {"goal": "lose"}]
+To update the user's profile (valid fields: weight_kg, height_cm, age, activity_level): [UPDATE_PROFILE: {"weight_kg": 80}]
 
 Do NOT output these tags inside code blocks. Just plain text at the end of the message. 
 If no action is needed, just respond normally without any tags.`;
@@ -123,7 +126,7 @@ If no action is needed, just respond normally without any tags.`;
               if (textChunk) {
                 accumulatedText += textChunk;
                 const now = Date.now();
-                if (now - lastUpdateTime > 80) {
+                if (now - lastUpdateTime > 30) {
                   onUpdate(accumulatedText);
                   lastUpdateTime = now;
                 }

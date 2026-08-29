@@ -96,7 +96,7 @@ const QUICK_SUGGESTION_KEYS: StringKey[] = [
   'chat.suggestion.allergies',
 ];
 
-const MessageItem = React.memo(({ item, styles }: { item: Message, styles: any }) => {
+const MessageItem = React.memo(({ item, styles, user }: { item: Message, styles: any, user?: any }) => {
   const isCoach = item.sender === 'coach';
   return (
     <View style={[styles.msgWrapper, isCoach ? styles.msgCoachWrapper : styles.msgUserWrapper]}>
@@ -115,12 +115,16 @@ const MessageItem = React.memo(({ item, styles }: { item: Message, styles: any }
       </View>
       {!isCoach && (
         <View style={styles.userAvatarCircle}>
-          <Ionicons name="person" size={24} color={styles.msgBubbleUser.backgroundColor} />
+          {user?.avatar_uri ? (
+            <Image source={{ uri: user.avatar_uri }} style={{ width: '100%', height: '100%', borderRadius: 18 }} resizeMode="cover" />
+          ) : (
+            <Ionicons name="person" size={24} color={styles.msgBubbleUser.backgroundColor} />
+          )}
         </View>
       )}
     </View>
   );
-}, (prev, next) => prev.item.text === next.item.text && prev.item.id === next.item.id);
+}, (prev, next) => prev.item.text === next.item.text && prev.item.id === next.item.id && prev.user?.avatar_uri === next.user?.avatar_uri);
 
 export interface StreamingBubbleRef {
   setText: (text: string) => void;
@@ -155,7 +159,7 @@ export default function ChatScreen() {
   const [scannerCameraVisible, setScannerCameraVisible] = useState(false);
   const streamingBubbleRef = useRef<StreamingBubbleRef>(null);
 
-  const { logMeal, deleteMeal, totals, targets, remaining, meals } = useMeals();
+  const { logMeal, deleteMeal, totals, targets, remaining, meals, loadToday } = useMeals();
   const { user, updateUser } = useAuth();
   const { lang, t } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -450,10 +454,9 @@ export default function ChatScreen() {
     const netInfo = await NetInfo.fetch();
     const isOnline = netInfo.isConnected && netInfo.isInternetReachable !== false;
 
-    const fallbackParse = () => {
+    const fallbackParse = async () => {
       // Process Response
-      setTimeout(async () => {
-        const parsed = parseChatMessage(textToSend);
+      const parsed = parseChatMessage(textToSend);
         let coachResponseText = '';
       let nextMascot: MascotState = 'idle';
       let nextStatus: StringKey = 'chat.statusMotivated';
@@ -518,7 +521,7 @@ export default function ChatScreen() {
           meals.forEach((m) => {
             const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const mealLabel = getMealTypeLabel(lang, m.meal_type).toUpperCase();
-            mealList += `🍳 **${t('chat.mealAtTime', { mealType: mealLabel, time })}**\n`;
+            mealList += `🍳 ${t('chat.mealAtTime', { mealType: mealLabel, time })}\n`;
             m.items.forEach((item) => {
               const bones = item.with_bones ? t('chat.minusBones', { grams: item.bone_weight_g ?? 0 }) : '';
               mealList += `- ${item.food_name || t('mealSection.item')} (${item.quantity_g}g${bones})\n`;
@@ -657,7 +660,7 @@ export default function ChatScreen() {
                         ? `${t('chat.recNextMeal', { count: remainingMealsToEat, kcal: Math.round(caloriesPerRemainingMeal) })}\n\n`
                         : `${t('chat.recExact', { kcal: Math.round(remCals) })}\n\n`;
                       recs.forEach((r: any) => {
-                         recText += `🍽️ **${r.name}**\n${t('chat.recTotalPortion', { grams: Math.round(r.macros_per_portion.portion_g) })}\n${Math.round(r.macros_per_portion.calories)} ${t('macro.kcal')} | ${Math.round(r.macros_per_portion.protein)}g ${t('macro.protein')}\n\n${t('chat.recIngredients')}\n`;
+                         recText += `🍽️ ${r.name}\n${t('chat.recTotalPortion', { grams: Math.round(r.macros_per_portion.portion_g) })}\n${Math.round(r.macros_per_portion.calories)} ${t('macro.kcal')} | ${Math.round(r.macros_per_portion.protein)}g ${t('macro.protein')}\n\n${t('chat.recIngredients')}\n`;
                          if (r.ingredients && r.ingredients.length > 0) {
                              r.ingredients.forEach((ing: any) => {
                                  recText += `- ${Math.round(ing.qty_g)}g ${ing.name}\n`;
@@ -731,7 +734,7 @@ export default function ChatScreen() {
             
             const foodName = originalItem?.matchedItem?.name || it.food_type || t('mealSection.item');
             const bonesSuffix = it.bone_weight_g ? t('chat.logItemBones', { grams: it.bone_weight_g }) : '';
-            summaryText += `🍗 **${foodName}** (${it.quantity_g}g${bonesSuffix})\n`;
+            summaryText += `🍗 ${foodName} (${it.quantity_g}g${bonesSuffix})\n`;
           }
 
           const totalsText = t('chat.logTotals', {
@@ -744,7 +747,7 @@ export default function ChatScreen() {
 
           if (matchedAllergens.size > 0) {
             const labels = Array.from(matchedAllergens).map((a) => labelForOptionKey(lang, a)).join(', ');
-            coachResponseText = `⚠️ **${t('chat.allergenLoggedTitle')}**\n${t('chat.allergenLoggedBody', { allergens: labels })}\n\n${summaryText}\n${totalsText}`;
+            coachResponseText = `⚠️ ${t('chat.allergenLoggedTitle')}\n${t('chat.allergenLoggedBody', { allergens: labels })}\n\n${summaryText}\n${totalsText}`;
             nextMascot = isLate ? 'sleeppp' : 'worry';
             nextStatus = isLate ? 'chat.statusSleepy' : 'chat.statusWorried';
           } else {
@@ -772,7 +775,6 @@ export default function ChatScreen() {
       changeMascotState(nextMascot, nextStatus);
 
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    }, 1500);
     };
 
     if (isOnline) {
@@ -799,12 +801,39 @@ export default function ChatScreen() {
         context,
         (partialText) => {
           setIsTyping(false);
-          const cleanText = partialText.replace(/\[(?:LOG_MEAL|DELETE_MEAL|CHANGE_GOAL):.*?\]/g, '');
+          let cleanText = partialText;
+          const matchIdx = cleanText.search(/\[(?:LOG_MEAL|DELETE_MEAL|CHANGE_GOAL|UPDATE_PROFILE):/);
+          if (matchIdx !== -1) {
+            cleanText = cleanText.substring(0, matchIdx).trim();
+          }
           streamingBubbleRef.current?.setText(cleanText);
         },
         async (finalText) => {
           streamingBubbleRef.current?.clear();
-          const cleanText = finalText.replace(/\[(?:LOG_MEAL|DELETE_MEAL|CHANGE_GOAL):.*?\]/g, '');
+          
+          let cleanText = finalText;
+          let parsedData: any = null;
+          let parsedAction: string | null = null;
+          
+          const actionTypes = ['LOG_MEAL', 'DELETE_MEAL', 'CHANGE_GOAL', 'UPDATE_PROFILE'];
+          for (const type of actionTypes) {
+            const prefix = `[${type}:`;
+            const startIdx = cleanText.indexOf(prefix);
+            if (startIdx !== -1) {
+              const endIdx = cleanText.lastIndexOf(']');
+              if (endIdx > startIdx) {
+                const jsonStr = cleanText.substring(startIdx + prefix.length, endIdx).trim();
+                cleanText = (cleanText.substring(0, startIdx) + cleanText.substring(endIdx + 1)).trim();
+                try {
+                  parsedData = JSON.parse(jsonStr);
+                  parsedAction = type;
+                } catch (e) {
+                  console.error('Failed to parse AI action JSON:', e, 'Raw string:', jsonStr);
+                }
+                break;
+              }
+            }
+          }
           
           setMessages((prev) => [...prev, {
             id: Math.random().toString(),
@@ -814,36 +843,34 @@ export default function ChatScreen() {
             mascotState: 'idle'
           }]);
           
-          const logMatch = finalText.match(/\[LOG_MEAL:\s*(.*?)\s*\]/);
-          const delMatch = finalText.match(/\[DELETE_MEAL:\s*(.*?)\s*\]/);
-          const goalMatch = finalText.match(/\[CHANGE_GOAL:\s*(.*?)\s*\]/);
-          
           try {
-            if (logMatch) {
-              const data = JSON.parse(logMatch[1]);
-              await logMeal(data.meal_type || 'snack', data.items.map((it: any) => ({
+            if (parsedAction === 'LOG_MEAL' && parsedData) {
+              await logMeal(parsedData.meal_type || 'snack', parsedData.items.map((it: any) => ({
                 type: 'manual',
                 quantity_g: it.grams || 100,
                 food_type: it.name,
                 method: it.method || 'raw'
               })));
             }
-            if (delMatch) {
-              const data = JSON.parse(delMatch[1]);
-              const mealType = data.meal_type;
+            if (parsedAction === 'DELETE_MEAL' && parsedData) {
+              const mealType = parsedData.meal_type;
               const mealToDelete = [...(meals||[])].reverse().find(m => m.meal_type === mealType);
               if (mealToDelete) {
                 await deleteMeal(mealToDelete.id);
               }
             }
-            if (goalMatch) {
-              const data = JSON.parse(goalMatch[1]);
-              if (['lose', 'gain', 'maintain'].includes(data.goal)) {
-                await updateUser({ goal: data.goal });
+            if (parsedAction === 'CHANGE_GOAL' && parsedData) {
+              if (['lose', 'gain', 'maintain'].includes(parsedData.goal)) {
+                await updateUser({ goal: parsedData.goal });
+                await loadToday();
               }
             }
+            if (parsedAction === 'UPDATE_PROFILE' && parsedData) {
+              await updateUser(parsedData);
+              await loadToday();
+            }
           } catch(e) {
-            console.error('Failed to parse AI action:', e);
+            console.error('Failed to execute AI action:', e);
           }
           
           const hour = new Date().getHours();
@@ -943,8 +970,8 @@ export default function ChatScreen() {
   };
 
   const renderMessage = useCallback(({ item }: { item: Message }) => {
-    return <MessageItem item={item} styles={styles} />;
-  }, [styles]);
+    return <MessageItem item={item} styles={styles} user={user} />;
+  }, [styles, user]);
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>

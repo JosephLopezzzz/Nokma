@@ -79,7 +79,7 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
       setIsProcessing(true);
       setScannedData(createEmptyNutritionData());
       try {
-        const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
+        const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.1 });
         if (photo?.base64 && photo?.uri) {
           setCapturedImage(photo.uri);
           const finalData = await scanNutritionFactsProgressive(photo.base64, (partialData) => {
