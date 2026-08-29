@@ -125,6 +125,7 @@ export default function CoachOnboarding() {
   const [typingDone, setTypingDone] = useState(true);
   const [saving, setSaving] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   const healthGroups = useMemo(() => getHealthConditionGroups(lang), [lang]);
   const allergenGroups = useMemo(() => getAllergenGroups(lang), [lang]);
@@ -171,21 +172,21 @@ export default function CoachOnboarding() {
   const goToStep = useCallback(
     (next: number) => {
       setTypingDone(false);
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }).start(() => {
+      const isForward = next > step;
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: isForward ? -40 : 40, duration: 150, useNativeDriver: true })
+      ]).start(() => {
         setStep(next);
         saveProgress(next, form);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }).start();
+        slideAnim.setValue(isForward ? 40 : -40);
+        Animated.parallel([
+          Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+          Animated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true })
+        ]).start();
       });
     },
-    [form, saveProgress],
+    [form, saveProgress, step],
   );
 
   const validateCurrent = (): boolean => {
@@ -325,10 +326,8 @@ export default function CoachOnboarding() {
           <View style={styles.backBtn} />
         )}
         {currentStep !== 'language' && currentStep !== 'feedback' && (
-          <View style={styles.dotsRow}>
-            {visibleSteps.map((_, i) => (
-              <View key={i} style={[styles.dot, i <= dotIndex && styles.dotActive]} />
-            ))}
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBarFill, { width: `${((dotIndex + 1) / visibleSteps.length) * 100}%` }]} />
           </View>
         )}
         <View style={styles.backBtn} />
@@ -341,7 +340,7 @@ export default function CoachOnboarding() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View style={{ opacity: fadeAnim }}>
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateX: slideAnim }] }}>
           {/* ── Language selection ── */}
           {currentStep === 'language' && (
             <View style={styles.langScreen}>
@@ -418,7 +417,7 @@ export default function CoachOnboarding() {
               bubbleRef={bubbleRef}
             >
               <TextInput
-                style={styles.inputCard}
+                style={styles.inputCardCentered}
                 placeholder={getAgePlaceholder(lang)}
                 placeholderTextColor="#9CA3AF"
                 value={form.age}
@@ -476,7 +475,7 @@ export default function CoachOnboarding() {
                   <Text style={styles.fieldLabel}>{t('onboarding.height')}</Text>
                   <View style={styles.inputWithUnit}>
                     <TextInput
-                      style={[styles.inputCard, styles.inputFlex]}
+                      style={[styles.inputCardCentered, styles.inputFlex]}
                       placeholder={`e.g. ${form.heightUnit === 'cm' ? '175' : "5'9\""}`}
                       placeholderTextColor="#9CA3AF"
                       value={form.heightValue}
@@ -494,7 +493,7 @@ export default function CoachOnboarding() {
                   <Text style={styles.fieldLabel}>{t('onboarding.weight')}</Text>
                   <View style={styles.inputWithUnit}>
                     <TextInput
-                      style={[styles.inputCard, styles.inputFlex]}
+                      style={[styles.inputCardCentered, styles.inputFlex]}
                       placeholder={`e.g. ${form.weightUnit === 'kg' ? '70' : '154'}`}
                       placeholderTextColor="#9CA3AF"
                       value={form.weightValue}
@@ -541,20 +540,31 @@ export default function CoachOnboarding() {
               bubbleRef={bubbleRef}
             >
               <View style={styles.optionsStack}>
-                {goalKeys.map((g) => (
-                  <Pressable
-                    key={g}
-                    style={[styles.optionCard, form.goal === g && styles.optionCardActive]}
-                    onPress={() => updateForm({ goal: g })}
-                  >
-                    <Text style={[styles.optionCardText, form.goal === g && styles.optionCardTextActive]}>
-                      {getGoalLabel(lang, g)}
-                    </Text>
-                    {form.goal === g && (
-                      <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
-                    )}
-                  </Pressable>
-                ))}
+                {goalKeys.map((g) => {
+                  const iconName = 
+                    g === 'lose' ? 'flame-outline' : 
+                    g === 'gain' ? 'barbell-outline' : 
+                    g === 'maintain' ? 'scale-outline' : 'leaf-outline';
+                  return (
+                    <Pressable
+                      key={g}
+                      style={[styles.optionCard, form.goal === g && styles.optionCardActive]}
+                      onPress={() => updateForm({ goal: g })}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View style={[styles.iconBox, form.goal === g && styles.iconBoxActive]}>
+                          <Ionicons name={iconName} size={24} color={form.goal === g ? Colors.primary : '#6B7280'} />
+                        </View>
+                        <Text style={[styles.optionCardText, form.goal === g && styles.optionCardTextActive]}>
+                          {getGoalLabel(lang, g)}
+                        </Text>
+                      </View>
+                      {form.goal === g && (
+                        <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
+                      )}
+                    </Pressable>
+                  );
+                })}
               </View>
               {form.goal ? (
                 <PrimaryBtn label={getConfirmLabel(lang)} onPress={() => goToStep(step + 1)} />
@@ -787,7 +797,13 @@ export default function CoachOnboarding() {
 
 function PrimaryBtn({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <Pressable style={styles.primaryBtn} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [
+        styles.primaryBtn,
+        pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+      ]}
+      onPress={onPress}
+    >
       <Text style={styles.primaryBtnText}>{label}</Text>
       <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 8 }} />
     </Pressable>
@@ -971,9 +987,19 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   backText: { fontSize: FontSize.md, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  dotsRow: { flexDirection: 'row', gap: 6 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#D1D5DB' },
-  dotActive: { backgroundColor: Colors.primary, width: 22, borderRadius: 4 },
+  progressBarContainer: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    marginHorizontal: Spacing.md,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: 3,
+  },
 
   scroll: {
     padding: Spacing.lg,
@@ -992,6 +1018,22 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     fontSize: FontSize.md,
+    color: '#111827',
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  inputCardCentered: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
     color: '#111827',
     shadowColor: '#000',
     shadowOpacity: 0.03,
@@ -1053,6 +1095,17 @@ const styles = StyleSheet.create({
   optionCardActive: {
     borderColor: Colors.primary,
     backgroundColor: '#FFF0EC',
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBoxActive: {
+    backgroundColor: '#FFD7CD',
   },
   optionCardText: {
     fontSize: FontSize.md,
