@@ -369,7 +369,7 @@ export default function DashboardScreen() {
                     </Text>
                   </View>
                   <Animated.Text style={[styles.streakWidgetEmoji, { transform: [{ scale: streakPulse }] }]}>
-                    {getLevelEmoji(streakInfo.levelName)}
+                    {getLevelEmoji(streakInfo.currentLevel)}
                   </Animated.Text>
                 </View>
                 

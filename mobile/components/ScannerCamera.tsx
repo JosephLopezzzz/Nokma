@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Animated, Dimensions, Modal, ScrollView, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Animated, Dimensions, Modal, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Rect, Mask, LinearGradient, Stop } from 'react-native-svg';
@@ -23,12 +24,23 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
   const [isProcessing, setIsProcessing] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [scannedData, setScannedData] = useState<ProgressiveNutritionData | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isTorchOn, setIsTorchOn] = useState(false);
+  const maskOpacityAnim = useRef(new Animated.Value(1)).current;
   const cameraRef = useRef<CameraView>(null);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   
   // Laser animation goes from -100 (above) to SCANNER_SIZE
   const laserAnim = useRef(new Animated.Value(-100)).current;
+
+  useEffect(() => {
+    Animated.timing(maskOpacityAnim, {
+      toValue: capturedImage ? 0 : 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [capturedImage, maskOpacityAnim]);
 
   useEffect(() => {
     if (visible && permission?.granted && !isProcessing) {
@@ -76,7 +88,9 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
 
   const takePicture = async () => {
     if (cameraRef.current && !isProcessing) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setIsProcessing(true);
+      setErrorMsg(null);
       setScannedData(createEmptyNutritionData());
       try {
         const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.1 });
@@ -87,21 +101,26 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
           });
           // Small delay for user to read the final screen before dismissing
           setTimeout(() => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             setIsProcessing(false);
             setScannedData(null);
             setCapturedImage(null);
             onCapture(finalData);
           }, 1200);
         } else {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           setIsProcessing(false);
           setScannedData(null);
           setCapturedImage(null);
+          setErrorMsg('Failed to capture image. Please try again.');
         }
       } catch (err) {
         console.error('Camera error:', err);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         setIsProcessing(false);
         setScannedData(null);
         setCapturedImage(null);
+        setErrorMsg("Couldn't read the label. Try moving closer or improving lighting.");
       }
     }
   };
@@ -135,15 +154,16 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>
       <View style={styles.container}>
-        <CameraView style={StyleSheet.absoluteFillObject} ref={cameraRef} facing="back" />
+        <CameraView style={StyleSheet.absoluteFillObject} ref={cameraRef} facing="back" enableTorch={isTorchOn} />
         
         {capturedImage && (
           <Image source={{ uri: capturedImage }} style={StyleSheet.absoluteFillObject} />
         )}
           
         {/* True Cutout Overlay using SVG Mask */}
-        <Svg style={StyleSheet.absoluteFill}>
-          <Defs>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: maskOpacityAnim }]} pointerEvents="none">
+          <Svg style={StyleSheet.absoluteFill}>
+            <Defs>
             <Mask id="mask">
               <Rect x={0} y={0} width="100%" height="100%" fill="white" />
               <Rect 
@@ -158,8 +178,9 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
           </Defs>
           <Rect x={0} y={0} width="100%" height="100%" fill="rgba(0,0,0,0.7)" mask="url(#mask)" />
         </Svg>
+      </Animated.View>
 
-        <View style={[StyleSheet.absoluteFillObject, styles.uiLayer]}>
+      <View style={[StyleSheet.absoluteFillObject, styles.uiLayer]}>
           {/* Top Bar */}
           <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
             <TouchableOpacity onPress={onClose} style={styles.iconBtn} disabled={isProcessing}>
@@ -169,7 +190,9 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
               <Text style={styles.headerTitle}>AI Scanner</Text>
               <Text style={styles.headerSubtitle}>Scan Nutrition Facts</Text>
             </View>
-            <View style={{ width: 28 }} />
+            <TouchableOpacity onPress={() => setIsTorchOn(!isTorchOn)} style={styles.iconBtn} disabled={isProcessing}>
+              <Ionicons name={isTorchOn ? "flash" : "flash-outline"} size={28} color="white" />
+            </TouchableOpacity>
           </View>
 
           {/* Scanner Box Area (absolutely positioned to match SVG hole) */}
@@ -181,6 +204,17 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
               <View style={[styles.corner, styles.bottomLeft]} />
               <View style={[styles.corner, styles.bottomRight]} />
               
+              {/* Ghost Label Outline */}
+              <View style={styles.ghostLabel} pointerEvents="none">
+                <View style={[styles.ghostLine, { height: 6, width: '100%', marginBottom: 8 }]} />
+                <View style={[styles.ghostLine, { width: '100%' }]} />
+                <View style={[styles.ghostLine, { width: '80%' }]} />
+                <View style={[styles.ghostLine, { width: '90%' }]} />
+                <View style={[styles.ghostLine, { width: '100%' }]} />
+                <View style={[styles.ghostLine, { width: '70%' }]} />
+                <View style={[styles.ghostLine, { height: 4, width: '100%', marginTop: 8 }]} />
+              </View>
+
               {/* Laser Animation */}
               {!isProcessing && (
                 <Animated.View
@@ -208,6 +242,13 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
           <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.xl }]}>
             {isProcessing ? (
               renderProgressiveFields()
+            ) : errorMsg ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{errorMsg}</Text>
+                <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary, marginTop: Spacing.md }]} onPress={() => setErrorMsg(null)}>
+                  <Text style={styles.btnText}>Try Again</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               <TouchableOpacity 
                 style={styles.captureBtn} 
@@ -231,6 +272,7 @@ function ProgressiveField({ label, data }: { label: string; data: { value: numbe
 
   useEffect(() => {
     if (isFound) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       Animated.spring(anim, {
         toValue: 1,
         friction: 5,
@@ -266,6 +308,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   camera: { flex: 1 },
   uiLayer: { flex: 1, justifyContent: 'space-between' },
+  errorContainer: { alignItems: 'center', paddingHorizontal: Spacing.xl },
+  errorText: { color: '#ff6b6b', textAlign: 'center', fontSize: 16, fontWeight: '500' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg },
   iconBtn: { padding: Spacing.xs },
   headerTitleContainer: { alignItems: 'center' },
@@ -284,6 +328,8 @@ const styles = StyleSheet.create({
   topRight: { top: -2, right: -2, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: SCANNER_RADIUS },
   bottomLeft: { bottom: -2, left: -2, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: SCANNER_RADIUS },
   bottomRight: { bottom: -2, right: -2, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: SCANNER_RADIUS },
+  ghostLabel: { position: 'absolute', top: 30, left: 30, right: 30, bottom: 30, justifyContent: 'space-evenly', opacity: 0.15 },
+  ghostLine: { height: 2, backgroundColor: 'white', borderRadius: 2 },
   laserContainer: { position: 'absolute', left: 0, right: 0, height: 100 },
   footer: { alignItems: 'center', paddingTop: Spacing.xl, paddingHorizontal: Spacing.lg },
   captureBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center' },

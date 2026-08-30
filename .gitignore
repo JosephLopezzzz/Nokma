@@ -25,3 +25,5 @@ yarn-error.*
 .agents/
 .claude/
 .gemini/
+.agent/
+.impeccable/
