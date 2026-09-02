@@ -5,6 +5,7 @@ import { useRef } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
 import { FontSize } from '../../constants/theme';
+import AnimatedPressable from '../../components/AnimatedPressable';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -149,16 +150,17 @@ export default function TabLayout() {
         style={[styles.floatingButton, { transform: pan.getTranslateTransform() }]} 
         {...panResponder.panHandlers}
       >
-        <Pressable 
+        <AnimatedPressable 
           style={{ width: '100%', height: '100%' }}
           onPress={() => router.push('/chat-modal')}
+          scaleTo={0.9}
         >
           <Image 
             source={require('../../assets/mascot/chatbot update.png')} 
             style={styles.floatingImage} 
             resizeMode="cover" 
           />
-        </Pressable>
+        </AnimatedPressable>
       </Animated.View>
     </View>
   );

@@ -17,6 +17,7 @@ import Confetti from './Confetti';
 import { useLanguage } from '../context/LanguageContext';
 import type { StringKey } from '../constants/i18n';
 import { Colors, FontSize, FontWeight, Spacing, Radius } from '../constants/theme';
+import AnimatedPressable from './AnimatedPressable';
 
 const TUTORIAL_KEY = 'nokma_tutorial_complete';
 
@@ -390,7 +391,7 @@ export default function DashboardTutorial({
 
         {/* Sticky navigation footer — always pinned to the bottom */}
         <Animated.View style={[styles.stickyFooter, { opacity: fadeAnim, paddingBottom: Math.max(insets.bottom, 16), zIndex: 9999 }]}>
-          <Pressable onPress={handleSkip} style={styles.skipBtn}>
+          <Pressable onPress={handleSkip} style={({pressed}) => [styles.skipBtn, pressed && {opacity: 0.7}]}>
             <Text style={styles.skipText}>{t('common.skip')}</Text>
           </Pressable>
 
@@ -402,27 +403,30 @@ export default function DashboardTutorial({
 
           <View style={styles.navGroup}>
             {!isFirst && (
-              <Pressable
+              <AnimatedPressable
                 style={styles.navBtn}
                 onPress={() => goTo(step - 1)}
+                scaleTo={0.95}
               >
                 <Text style={styles.navBtnText}>{t('common.back')}</Text>
-              </Pressable>
+              </AnimatedPressable>
             )}
             {isLast ? (
-              <Pressable
+              <AnimatedPressable
                 style={[styles.navBtn, styles.doneBtn]}
                 onPress={handleComplete}
+                scaleTo={0.95}
               >
                 <Text style={styles.doneBtnText}>{t('common.done')}</Text>
-              </Pressable>
+              </AnimatedPressable>
             ) : (
-              <Pressable
+              <AnimatedPressable
                 style={[styles.navBtn, styles.nextBtn]}
                 onPress={() => goTo(step + 1)}
+                scaleTo={0.95}
               >
                 <Text style={styles.nextBtnText}>{t('common.next')}</Text>
-              </Pressable>
+              </AnimatedPressable>
             )}
           </View>
         </Animated.View>

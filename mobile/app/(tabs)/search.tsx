@@ -344,7 +344,7 @@ export default function SearchScreen() {
             onAdd={() => handleAddPress(item)}
           />
           {isCustom && (
-            <Pressable style={styles.deleteBtn} onPress={() => handleDelete(item.id, false)}>
+            <Pressable style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]} onPress={() => handleDelete(item.id, false)}>
               <Ionicons name="trash" size={16} color={colors.error} />
               <Text style={styles.deleteBtnText}>{t('search.deleteCustomFood')}</Text>
             </Pressable>
@@ -368,7 +368,7 @@ export default function SearchScreen() {
           onAdd={() => handleAddPress(item)}
         />
         {isCustomFF && (
-          <Pressable style={styles.deleteBtn} onPress={() => handleDelete(item.id, true)}>
+          <Pressable style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]} onPress={() => handleDelete(item.id, true)}>
             <Ionicons name="trash" size={16} color={colors.error} />
             <Text style={styles.deleteBtnText}>{t('search.deleteFastFood')}</Text>
           </Pressable>
@@ -396,7 +396,7 @@ export default function SearchScreen() {
             }}
           />
           {query.length > 0 && (
-            <Pressable onPress={() => { setQuery(''); search(''); }} hitSlop={15}>
+            <Pressable style={({ pressed }) => [pressed && { opacity: 0.5 }]} onPress={() => { setQuery(''); search(''); }} hitSlop={15}>
               <Ionicons name="close-circle" size={22} color={colors.textMuted} />
             </Pressable>
           )}
@@ -405,7 +405,7 @@ export default function SearchScreen() {
         {/* Segmented Control Tabs */}
         <View style={styles.tabsContainer}>
           <Pressable
-            style={[styles.tabSegment, activeTab === 'foods' && styles.tabSegmentActive]}
+            style={({ pressed }) => [styles.tabSegment, activeTab === 'foods' && styles.tabSegmentActive, pressed && { opacity: 0.8 }]}
             onPress={() => setActiveTab('foods')}
           >
             <Ionicons name="nutrition-outline" size={16} color={activeTab === 'foods' ? colors.primary : colors.textSecondary} />
@@ -415,7 +415,7 @@ export default function SearchScreen() {
           </Pressable>
           
           <Pressable
-            style={[styles.tabSegment, activeTab === 'restaurant' && styles.tabSegmentActive]}
+            style={({ pressed }) => [styles.tabSegment, activeTab === 'restaurant' && styles.tabSegmentActive, pressed && { opacity: 0.8 }]}
             onPress={() => setActiveTab('restaurant')}
           >
             <Ionicons name="fast-food-outline" size={16} color={activeTab === 'restaurant' ? colors.primary : colors.textSecondary} />
@@ -547,12 +547,12 @@ export default function SearchScreen() {
           </View>
 
           <View style={styles.modalBtnRow}>
-            <Pressable style={styles.ghostBtn} onPress={() => setModalVisible(false)}>
+            <AnimatedPressable style={styles.ghostBtn} onPress={() => setModalVisible(false)} scaleTo={0.95}>
               <Text style={styles.ghostBtnText}>{t('common.cancel')}</Text>
-            </Pressable>
-            <Pressable style={styles.modalSaveBtn} onPress={handleSaveCustomItem}>
+            </AnimatedPressable>
+            <AnimatedPressable style={styles.modalSaveBtn} onPress={handleSaveCustomItem} scaleTo={0.95}>
               <Text style={styles.modalSaveText}>{t('search.saveItem')}</Text>
-            </Pressable>
+            </AnimatedPressable>
           </View>
         </ScrollView>
       </PlatformModal>
@@ -649,12 +649,12 @@ export default function SearchScreen() {
               })()}
 
               <View style={styles.modalBtnRow}>
-                <Pressable style={styles.ghostBtn} onPress={() => setDetailModalVisible(false)}>
+                <AnimatedPressable style={styles.ghostBtn} onPress={() => setDetailModalVisible(false)} scaleTo={0.95}>
                   <Text style={styles.ghostBtnText}>{t('common.close')}</Text>
-                </Pressable>
-                <Pressable style={styles.modalSaveBtn} onPress={() => { setDetailModalVisible(false); handleAddPress(selectedItem); }}>
+                </AnimatedPressable>
+                <AnimatedPressable style={styles.modalSaveBtn} onPress={() => { setDetailModalVisible(false); handleAddPress(selectedItem); }} scaleTo={0.95}>
                   <Text style={styles.modalSaveText}>{t('search.logThisItem')}</Text>
-                </Pressable>
+                </AnimatedPressable>
               </View>
             </ScrollView>
           </>
@@ -693,7 +693,7 @@ export default function SearchScreen() {
             ))}
 
             <Pressable
-              style={styles.mealTypeCancel}
+              style={({ pressed }) => [styles.mealTypeCancel, pressed && { opacity: 0.7 }]}
               onPress={() => {
                 setMealTypeModalVisible(false);
                 setPendingLogItem(null);

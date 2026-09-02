@@ -21,6 +21,7 @@ import ScannerCamera from '../components/ScannerCamera';
 import { ProgressiveNutritionData } from '../services/nutritionScanner';
 import NetInfo from '@react-native-community/netinfo';
 import { streamChatResponse, ChatMessage, ChatAiContext } from '../services/chatAiService';
+import AnimatedPressable from '../components/AnimatedPressable';
 
 // ─── Mascot Image Map (root-level high-res for header) ───────────────────────
 const MASCOT_IMAGES = {
@@ -1016,9 +1017,9 @@ export default function ChatScreen() {
               <Text style={styles.statusText}>{t(mascotStatusKey)}</Text>
             </View>
           </View>
-          <Pressable onPress={() => router.back()} style={styles.closeBtn}>
+          <AnimatedPressable onPress={() => router.back()} style={styles.closeBtn} scaleTo={0.9}>
             <Ionicons name="close-circle" size={32} color={colors.border} />
-          </Pressable>
+          </AnimatedPressable>
         </View>
       
       {/* Chat Messages */}
@@ -1048,13 +1049,14 @@ export default function ChatScreen() {
           {QUICK_SUGGESTION_KEYS.map((key) => {
             const label = t(key);
             return (
-              <Pressable
+              <AnimatedPressable
                 key={key}
                 style={styles.suggestionChip}
                 onPress={() => setInputText(label)}
+                scaleTo={0.95}
               >
                 <Text style={styles.suggestionText}>{label}</Text>
-              </Pressable>
+              </AnimatedPressable>
             );
           })}
         </ScrollView>
@@ -1062,9 +1064,9 @@ export default function ChatScreen() {
 
       {/* Message Input Bar */}
       <View style={styles.inputContainer}>
-        <Pressable style={styles.attachBtn} onPress={() => setScannerCameraVisible(true)}>
+        <AnimatedPressable style={styles.attachBtn} onPress={() => setScannerCameraVisible(true)} scaleTo={0.9}>
           <Ionicons name="camera" size={24} color={colors.textMuted} />
-        </Pressable>
+        </AnimatedPressable>
         <TextInput
           style={styles.input}
           placeholder={t('chat.inputPlaceholder')}
@@ -1074,13 +1076,14 @@ export default function ChatScreen() {
           multiline={false}
           onSubmitEditing={() => handleSend(inputText)}
         />
-        <Pressable
+        <AnimatedPressable
           style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
           onPress={() => handleSend(inputText)}
           disabled={!inputText.trim()}
+          scaleTo={0.9}
         >
           <Ionicons name="send" size={18} color={colors.textInverse} />
-        </Pressable>
+        </AnimatedPressable>
       </View>
       </View>
       <ScannerCamera 

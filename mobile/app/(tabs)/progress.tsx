@@ -10,7 +10,9 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import MealSection from '../../components/MealSection';
+import AnimatedPressable from '../../components/AnimatedPressable';
 import { useStreak } from '../../hooks/useStreak';
 import {
   getQualityColor, getLevelGradient, getLevelEmoji,
@@ -150,18 +152,27 @@ export default function ProgressScreen() {
 
   const chartConfig = {
     backgroundGradientFrom: colors.bgCard,
+    backgroundGradientFromOpacity: 0,
     backgroundGradientTo: colors.bgCard,
-    color: (opacity = 1) => `rgba(${isDark ? '255, 255, 255' : '30, 41, 59'}, ${opacity})`,
+    backgroundGradientToOpacity: 0,
+    color: (opacity = 1) => colors.primary + Math.round(opacity * 255).toString(16).padStart(2, '0'), // use primary color for fill
     labelColor: (opacity = 1) => `rgba(${isDark ? '148, 163, 184' : '100, 116, 139'}, ${opacity})`,
-    strokeWidth: 2,
-    barPercentage: 0.65,
+    strokeWidth: 3,
+    barPercentage: 1.2,
     useShadowColorFromDataset: false,
     decimalPlaces: 0,
     propsForDots: {
-      r: '4',
+      r: '5',
       strokeWidth: '2',
-      stroke: colors.primary,
+      stroke: colors.bgCard,
     },
+    propsForBackgroundLines: {
+      strokeWidth: 0,
+    },
+    fillShadowGradientFrom: colors.primary,
+    fillShadowGradientFromOpacity: 0.2,
+    fillShadowGradientTo: colors.primary,
+    fillShadowGradientToOpacity: 0,
   };
 
   const calorieData = useMemo(() => {
@@ -211,26 +222,27 @@ export default function ProgressScreen() {
 
   return (
     <View style={styles.root}>
+      {/* impeccable:contract 1 
+      THESIS: A dashboard that treats habit consistency as a premium game rather than a spreadsheet, while keeping macro data scannable and undeniable.
+      OWN-WORLD: Drenched streak card leveraging heavy brand colors, native segmented controls, and minimalist editorial charts.
+      STORY: The user sees their immediate streak rewarded beautifully, then scans their adherence objectively.
+      FIRST VIEWPORT: Segmented control top, deeply saturated streak hero card taking up the first fold.
+      FORM: Dashboard
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+      */}
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
-        <View style={styles.segmentedControl}>
-          <Pressable
-            style={[styles.segmentBtn, activeTab === 'diary' && styles.segmentBtnActive]}
-            onPress={() => setActiveTab('diary')}
-          >
-            <Text style={[styles.segmentText, activeTab === 'diary' && styles.segmentTextActive]}>
-              {t('dash.todaysMeals') || 'Diary'}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.segmentBtn, activeTab === 'charts' && styles.segmentBtnActive]}
-            onPress={() => setActiveTab('charts')}
-          >
-            <Text style={[styles.segmentText, activeTab === 'charts' && styles.segmentTextActive]}>
-              Charts
-            </Text>
-          </Pressable>
-        </View>
+        <SegmentedControl
+          values={[t('dash.todaysMeals') || 'Diary', 'Charts']}
+          selectedIndex={activeTab === 'diary' ? 0 : 1}
+          onChange={(event) => {
+            setActiveTab(event.nativeEvent.selectedSegmentIndex === 0 ? 'diary' : 'charts');
+          }}
+          tintColor={colors.primary}
+          fontStyle={{ color: colors.textSecondary }}
+          activeFontStyle={{ color: colors.bg }}
+          style={{ marginBottom: Spacing.sm }}
+        />
 
         {activeTab === 'charts' && (
           <View style={[styles.headerTop, { marginTop: Spacing.md }]}>
@@ -241,7 +253,7 @@ export default function ProgressScreen() {
                 return (
                   <Pressable
                     key={tf}
-                    style={[styles.chip, active && styles.chipActive]}
+                    style={({pressed}) => [styles.chip, active && styles.chipActive, pressed && {opacity: 0.8}]}
                     onPress={() => setTimeframe(tf)}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>{tf}D</Text>
@@ -274,9 +286,10 @@ export default function ProgressScreen() {
                     : t('dash.goodEvening')}
               </Text>
               <Text style={styles.emptySubText}>{t('dash.emptyMeals')}</Text>
-              <Pressable
+              <AnimatedPressable
                 style={styles.emptyCta}
                 onPress={() => router.push('/(tabs)/log')}
+                scaleTo={0.95}
               >
                 <Ionicons
                   name="add-circle-outline"
@@ -284,17 +297,18 @@ export default function ProgressScreen() {
                   color={colors.textInverse}
                 />
                 <Text style={styles.emptyCtaText}>{t('dash.logAMeal')}</Text>
-              </Pressable>
+              </AnimatedPressable>
             </View>
           ) : (
             <View style={styles.diaryList}>
-              <Pressable
+              <AnimatedPressable
                 onPress={() => router.push('/(tabs)/log')}
                 style={styles.addMealBtn}
+                scaleTo={0.95}
               >
                 <Ionicons name="add" size={16} color={colors.primary} />
                 <Text style={styles.addMealText}>{t('dash.add')}</Text>
-              </Pressable>
+              </AnimatedPressable>
               
               {meals.map((meal) => (
                 <MealSection key={meal.id} meal={meal} onDelete={deleteMeal} />
@@ -395,7 +409,7 @@ export default function ProgressScreen() {
             chartConfig={chartConfig}
             bezier
             style={styles.chart}
-            withInnerLines={true}
+            withInnerLines={false}
             withOuterLines={false}
           />
         </View>
@@ -417,6 +431,7 @@ export default function ProgressScreen() {
             yAxisSuffix="g"
             chartConfig={chartConfig}
             style={styles.chart}
+            withInnerLines={false}
             withCustomBarColorFromData
             flatColor
           />
@@ -538,12 +553,12 @@ function StreakHeroCard({
         <View style={styles.streakCalNav}>
           <Text style={styles.streakCalMonth}>{calMonthLabel}</Text>
           <View style={styles.streakCalNavBtns}>
-            <Pressable onPress={onPrevMonth} style={styles.streakNavBtn}>
+            <Pressable onPress={onPrevMonth} style={({pressed}) => [styles.streakNavBtn, pressed && {opacity: 0.7}]}>
               <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
             </Pressable>
             <Pressable
               onPress={onNextMonth}
-              style={[styles.streakNavBtn, isCurrentMonth && styles.streakNavBtnDisabled]}
+              style={({pressed}) => [styles.streakNavBtn, isCurrentMonth && styles.streakNavBtnDisabled, pressed && {opacity: 0.7}]}
               disabled={isCurrentMonth}
             >
               <Ionicons name="chevron-forward" size={18}
@@ -768,8 +783,12 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderRadius: Radius.md,
     padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   kpiHeader: {
     flexDirection: 'row',
@@ -796,8 +815,12 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderRadius: Radius.lg,
     padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -867,13 +890,17 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   streakCard: {
     borderRadius: Radius.xl,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
     backgroundColor: colors.bgCard,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
   },
   streakHero: {
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.xxl || 40,
     paddingHorizontal: Spacing.lg,
     alignItems: 'center',
     overflow: 'hidden',
@@ -922,14 +949,21 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   streakHeroDayLabel: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.semibold,
-    color: 'rgba(255,255,255,0.9)',
+    color: '#ffffff',
     marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   streakHeroSubtitle: {
     fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.75)',
+    color: '#ffffff',
     marginTop: 6,
     textAlign: 'center',
+    fontWeight: FontWeight.medium,
+    textShadowColor: 'rgba(0,0,0,0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   // Calendar
   streakCalSection: {

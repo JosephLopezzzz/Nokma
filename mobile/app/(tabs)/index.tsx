@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable,
+  View, Text, StyleSheet, ScrollView,
   RefreshControl, Animated, TouchableOpacity, Dimensions
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
@@ -21,6 +21,7 @@ import { useStreak } from '../../hooks/useStreak';
 import { getQualityColor, getLevelEmoji } from '../../services/streakService';
 import { Colors as StaticColors, FontSize, FontWeight, Spacing, Radius, MEAL_TYPES, ThemeColors } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
+import AnimatedPressable from '../../components/AnimatedPressable';
 
 const CONFIRMATION_DURATION = 3000;
 
@@ -249,15 +250,15 @@ export default function DashboardScreen() {
                 <CalorieRing consumed={totals.calories} target={caloriesTarget} size={150} />
                 <View style={styles.quickActionsCol}>
                   <View ref={fabRef}>
-                    <Pressable style={[styles.quickActionBtn, styles.primaryActionBtn]} onPress={() => router.push('/(tabs)/log')}>
+                    <AnimatedPressable style={[styles.quickActionBtn, styles.primaryActionBtn]} onPress={() => router.push('/(tabs)/log')} scaleTo={0.95}>
                       <Ionicons name="restaurant" size={20} color="#FFFFFF" />
                       <Text style={[styles.quickActionText, { color: '#FFFFFF' }]}>{t('dash.logAMeal')}</Text>
-                    </Pressable>
+                    </AnimatedPressable>
                   </View>
-                  <Pressable style={styles.quickActionBtn} onPress={() => router.push('/(tabs)/search')}>
+                  <AnimatedPressable style={styles.quickActionBtn} onPress={() => router.push('/(tabs)/search')} scaleTo={0.95}>
                     <Ionicons name="search" size={20} color={colors.textPrimary} />
                     <Text style={styles.quickActionText}>{t('search.title')}</Text>
-                  </Pressable>
+                  </AnimatedPressable>
                 </View>
               </View>
             </View>
@@ -335,7 +336,7 @@ export default function DashboardScreen() {
             </View>
 
             {/* Streak Dashboard Widget */}
-            <Pressable onPress={() => router.push('/(tabs)/progress')}>
+            <AnimatedPressable onPress={() => router.push('/(tabs)/progress')} scaleTo={0.97}>
               <View
                 style={[
                   styles.streakWidgetCard,
@@ -398,7 +399,7 @@ export default function DashboardScreen() {
                   </View>
                 )}
               </View>
-            </Pressable>
+            </AnimatedPressable>
           </View>
         </View>
       </ScrollView>

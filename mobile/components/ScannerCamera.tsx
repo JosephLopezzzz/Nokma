@@ -114,13 +114,23 @@ export default function ScannerCamera({ visible, onCapture, onClose }: ScannerCa
           setCapturedImage(null);
           setErrorMsg('Failed to capture image. Please try again.');
         }
-      } catch (err) {
-        console.error('Camera error:', err);
+      } catch (err: any) {
+        const errorMessage = err?.message || '';
+        if (!errorMessage.includes('503') && !errorMessage.includes('high demand') && !errorMessage.includes('429')) {
+          console.error('Camera error:', err);
+        }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         setIsProcessing(false);
         setScannedData(null);
         setCapturedImage(null);
-        setErrorMsg("Couldn't read the label. Try moving closer or improving lighting.");
+
+        if (errorMessage.includes('503') || errorMessage.includes('high demand')) {
+          setErrorMsg('The AI service is experiencing high demand. Please try again later or log manually.');
+        } else if (errorMessage.includes('429')) {
+          setErrorMsg('Rate limit exceeded. Please wait a moment and try again.');
+        } else {
+          setErrorMsg("Couldn't read the label. Try moving closer or improving lighting.");
+        }
       }
     }
   };

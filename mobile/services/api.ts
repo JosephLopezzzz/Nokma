@@ -13,8 +13,20 @@ export const getLocalDateString = (d: Date = new Date()) => {
 
 export { FOODS_DB, RECIPES_DB };
 
-// Restaurants are added at runtime (custom scanning/adding), so the DB starts empty.
-export const RESTAURANT_DB: any[] = [];
+// Built-in fast food items
+export const RESTAURANT_DB: any[] = [
+  {
+    id: 'ff_r5',
+    name: 'Chicken Inasal',
+    restaurant_name: 'Mang Inasal',
+    serving_size_g: 300,
+    calories: 585,
+    protein: 72,
+    carbs: 3,
+    fat: 30,
+    description: 'Ilonggo-style grilled chicken marinated in calamansi, lemongrass, and annatto',
+  }
+];
 
 // ─── Local Helpers ────────────────────────────────────────────────────────────
 
@@ -106,7 +118,7 @@ async function lookupFoodName(type: string, id: string): Promise<string> {
   }
   if (type === 'restaurant') {
     const customFF = await getCustomFastFoods();
-    return customFF.find((rt: any) => rt.id === id)?.name ?? 'Fast Food Item';
+    return [...RESTAURANT_DB, ...customFF].find((rt: any) => rt.id === id)?.name ?? 'Fast Food Item';
   }
   return 'Food';
 }
@@ -266,7 +278,8 @@ export async function calculateItemMacros(item: any) {
       f = (baseRecipe.macros_per_100g?.fat ?? 0) * multiplier;
     }
   } else if (item.type === 'restaurant') {
-    const baseRest = RESTAURANT_DB.find(rt => rt.id === item.id);
+    const customFF = await getCustomFastFoods();
+    const baseRest = [...RESTAURANT_DB, ...customFF].find(rt => rt.id === item.id);
     if (baseRest) {
       const multiplier = quantity / baseRest.serving_size_g;
       cal = baseRest.calories * multiplier;
@@ -686,7 +699,7 @@ export const recommendApi = {
   restaurant: async (restaurant?: string) => {
     const qc = (restaurant || '').toLowerCase().trim();
     const customFF = await getCustomFastFoods();
-    let items = customFF;
+    let items = [...RESTAURANT_DB, ...customFF];
     if (qc) {
       items = items.filter((rt: any) => rt.restaurant_name?.toLowerCase().includes(qc) || rt.name.toLowerCase().includes(qc));
     }
