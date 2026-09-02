@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, FlatList,
-  Pressable, ActivityIndicator, ScrollView, Modal, Alert, Platform
+  Pressable, ActivityIndicator, ScrollView, Modal, Alert, Platform,
+  PanResponder, Animated, KeyboardAvoidingView, Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -25,6 +26,91 @@ const TABS: { key: TabKey; labelKey: StringKey; icon: string }[] = [
   { key: 'foods',      labelKey: 'search.tabFoods',      icon: 'nutrition-outline' },
   { key: 'restaurant', labelKey: 'search.tabRestaurant', icon: 'fast-food-outline' },
 ];
+
+const SwipeableModalContent = ({ visible, onClose, contentStyle, children }: any) => {
+  const { colors } = useTheme();
+  const panY = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (visible) panY.setValue(0);
+  }, [visible]);
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          panY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 120 || gestureState.vy > 1.2) {
+          onClose();
+        } else {
+          Animated.spring(panY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      }
+    })
+  ).current;
+
+  return (
+    <Animated.View style={[contentStyle, { transform: [{ translateY: panY }] }]}>
+      <Pressable onPress={(e) => e.stopPropagation()} style={{ width: '100%', flexShrink: 1 }}>
+        <View style={{ alignItems: 'center', paddingVertical: 16, marginTop: -16, flexShrink: 0 }} {...panResponder.panHandlers}>
+          <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border }} />
+        </View>
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+};
+
+const PlatformModal = ({ visible, onClose, children }: any) => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => getStyles(colors), [colors]);
+  const [isKeyboardVisible, setKeyboardVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const handleOverlayPress = () => {
+    if (isKeyboardVisible) {
+      Keyboard.dismiss();
+    } else {
+      onClose();
+    }
+  };
+
+  return (
+      <Modal 
+        visible={visible} 
+        animationType="slide" 
+        transparent={Platform.OS !== 'ios'}
+        presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : undefined}
+        onRequestClose={onClose}
+      >
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          {Platform.OS === 'ios' ? (
+            <View style={styles.iosPageSheetContent}>
+              {children}
+            </View>
+          ) : (
+            <Pressable style={styles.modalOverlay} onPress={handleOverlayPress}>
+              <SwipeableModalContent visible={visible} onClose={onClose} contentStyle={styles.modalContent}>
+                {children}
+              </SwipeableModalContent>
+            </Pressable>
+          )}
+        </KeyboardAvoidingView>
+      </Modal>
+  );
+};
 
 export default function SearchScreen() {
   const { user } = useAuth();
@@ -297,12 +383,11 @@ export default function SearchScreen() {
     <View style={styles.root}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
-        <Text style={styles.title}>{t('search.title')}</Text>
         <View style={styles.searchRow}>
           <Ionicons name="search" size={22} color={colors.textSecondary} />
           <TextInput
             style={styles.input}
-            placeholder={t('search.placeholder')}
+            placeholder={activeTab === 'foods' ? t('search.phFoods') : t('search.phRestaurant')}
             placeholderTextColor={colors.textMuted}
             value={query}
             onChangeText={(text) => {
@@ -319,49 +404,26 @@ export default function SearchScreen() {
 
         {/* Segmented Control Tabs */}
         <View style={styles.tabsContainer}>
-          <AnimatedPressable
+          <Pressable
             style={[styles.tabSegment, activeTab === 'foods' && styles.tabSegmentActive]}
             onPress={() => setActiveTab('foods')}
-            scaleTo={0.97}
           >
             <Ionicons name="nutrition-outline" size={16} color={activeTab === 'foods' ? colors.primary : colors.textSecondary} />
             <Text style={[styles.tabSegmentText, activeTab === 'foods' && styles.tabSegmentTextActive]}>
               {t('search.tabFoods')}
             </Text>
-          </AnimatedPressable>
+          </Pressable>
           
-          <AnimatedPressable
+          <Pressable
             style={[styles.tabSegment, activeTab === 'restaurant' && styles.tabSegmentActive]}
             onPress={() => setActiveTab('restaurant')}
-            scaleTo={0.97}
           >
             <Ionicons name="fast-food-outline" size={16} color={activeTab === 'restaurant' ? colors.primary : colors.textSecondary} />
             <Text style={[styles.tabSegmentText, activeTab === 'restaurant' && styles.tabSegmentTextActive]}>
               {t('search.tabRestaurant')}
             </Text>
-          </AnimatedPressable>
-        </View>
-      </View>
-
-      {/* Action Row */}
-      <View style={styles.actionRow}>
-        {activeTab === 'restaurant' ? (
-          <View style={styles.actionRow}>
-            <AnimatedPressable style={styles.actionBtn} onPress={handleScanMenu} scaleTo={0.97}>
-              <Ionicons name="scan" size={18} color={colors.primary} />
-              <Text style={styles.actionBtnText}>{t('search.scan')}</Text>
-            </AnimatedPressable>
-            <AnimatedPressable style={styles.actionBtn} onPress={() => setModalVisible(true)} scaleTo={0.97}>
-              <Ionicons name="add" size={18} color={colors.primary} />
-              <Text style={styles.actionBtnText}>{t('search.custom')}</Text>
-            </AnimatedPressable>
-          </View>
-        ) : (
-          <Pressable style={[styles.actionBtn, { flex: 1 }]} onPress={() => setModalVisible(true)}>
-            <Ionicons name="add-outline" size={18} color={colors.primary} />
-            <Text style={styles.actionBtnText}>{t('search.addCustomFood')}</Text>
           </Pressable>
-        )}
+        </View>
       </View>
 
       {/* Results */}
@@ -389,155 +451,219 @@ export default function SearchScreen() {
         />
       )}
 
+      {/* Floating Action Button (FAB) */}
+      <View style={styles.fabContainer}>
+        {activeTab === 'restaurant' && (
+          <AnimatedPressable style={[styles.fab, styles.fabSecondary]} onPress={handleScanMenu} scaleTo={0.9}>
+            <Ionicons name="scan" size={24} color={colors.textPrimary} />
+          </AnimatedPressable>
+        )}
+        <AnimatedPressable style={styles.fab} onPress={() => setModalVisible(true)} scaleTo={0.9}>
+          <Ionicons name="add" size={32} color="#FFFFFF" />
+        </AnimatedPressable>
+      </View>
+
       {/* Add Custom Item Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {activeTab === 'restaurant' ? t('search.addFastFood') : t('search.addCustomFood')}
-            </Text>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
-              <Text style={styles.inputLabel}>{t('search.name')}</Text>
-              <TextInput style={styles.modalInput} placeholder={t('ph.exampleMenuItem')} placeholderTextColor={colors.textMuted} value={newItemName} onChangeText={setNewItemName} />
-
-              {activeTab === 'restaurant' && (
-                <>
-                  <Text style={styles.inputLabel}>{t('search.restaurant')}</Text>
-                  <TextInput style={styles.modalInput} placeholder={t('ph.exampleRestaurant')} placeholderTextColor={colors.textMuted} value={newItemRestaurant} onChangeText={setNewItemRestaurant} />
-                </>
-              )}
-
-              <Text style={styles.inputLabel}>{t('macro.calories')}</Text>
-              <TextInput style={styles.modalInput} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={newItemCals} onChangeText={setNewItemCals} />
-
-              <Text style={styles.inputLabel}>{t('macro.protein')} (g)</Text>
-              <TextInput style={styles.modalInput} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={newItemProtein} onChangeText={setNewItemProtein} />
-
-              <Text style={styles.inputLabel}>{t('macro.carbs')} (g)</Text>
-              <TextInput style={styles.modalInput} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={newItemCarbs} onChangeText={setNewItemCarbs} />
-
-              <Text style={styles.inputLabel}>{t('macro.fat')} (g)</Text>
-              <TextInput style={styles.modalInput} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={newItemFat} onChangeText={setNewItemFat} />
-
-              <View style={styles.modalBtnRow}>
-                <Pressable style={styles.modalCancelBtn} onPress={() => setModalVisible(false)}>
-                  <Text style={styles.modalCancelText}>{t('common.cancel')}</Text>
-                </Pressable>
-                <Pressable style={styles.modalSaveBtn} onPress={handleSaveCustomItem}>
-                  <Text style={styles.modalSaveText}>{t('search.saveItem')}</Text>
-                </Pressable>
-              </View>
-            </ScrollView>
-          </View>
+      <PlatformModal visible={modalVisible} onClose={() => setModalVisible(false)}>
+        <View style={styles.modalHeaderCompact}>
+           <View style={[styles.modalHeaderIconCompact, { backgroundColor: activeTab === 'restaurant' ? colors.primaryGlow : colors.carbs + '20' }]}>
+             <Ionicons name={activeTab === 'restaurant' ? "fast-food" : "nutrition"} size={24} color={activeTab === 'restaurant' ? colors.primary : colors.carbs} />
+           </View>
+           <View style={{ flex: 1 }}>
+             <Text style={styles.modalTitleCompact}>
+               {activeTab === 'restaurant' ? t('search.addFastFood') : t('search.addCustomFood')}
+             </Text>
+             <Text style={styles.modalSubtitleCompact} numberOfLines={1}>
+               {activeTab === 'restaurant' ? 'Log a meal from your favorite spot' : 'Log a custom homemade recipe'}
+             </Text>
+           </View>
         </View>
-      </Modal>
 
-      {/* Detail Modal */}
-      <Modal visible={detailModalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {selectedItem && (
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={styles.modalScroll}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.formGroup}>
+            <View style={styles.formRow}>
+              <Text style={styles.inputLabel}>{t('search.name')}</Text>
+              <TextInput 
+                style={styles.formInput} 
+                placeholder={activeTab === 'restaurant' ? t('ph.exampleMenuItem') : t('ph.exampleCustomFood')} 
+                placeholderTextColor={colors.textMuted} 
+                value={newItemName} 
+                onChangeText={setNewItemName} 
+              />
+            </View>
+
+            {activeTab === 'restaurant' && (
               <>
-                <Text style={styles.modalTitle}>{selectedItem.name}</Text>
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
-                  
-                  {/* Category / Source info */}
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>{t('search.typeSource')}</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedItemSource === 'recipe'
-                        ? t('search.srcRecipe', { country: selectedItem.country })
-                        : selectedItemSource === 'restaurant'
-                          ? t('search.srcRestaurant', { restaurant: selectedItem.restaurant_name })
-                          : t('search.srcFood', { category: selectedItem.category || t('search.categoryGeneral') })}
-                    </Text>
-                  </View>
-
-                  {/* Macros Summary */}
-                  <View style={styles.detailMacrosContainer}>
-                    <Text style={styles.detailSecTitle}>{t('search.macrosBreakdown')}</Text>
-                    
-                    {(() => {
-                      const macros = selectedItem.macros_per_portion ?? selectedItem.macros_per_100g ?? {
-                        calories: selectedItem.calories_per_100g ?? selectedItem.calories ?? 0,
-                        protein: selectedItem.protein_per_100g ?? selectedItem.protein ?? 0,
-                        carbs: selectedItem.carbs_per_100g ?? selectedItem.carbs ?? 0,
-                        fat: selectedItem.fat_per_100g ?? selectedItem.fat ?? 0
-                      };
-                      const portionG = selectedItem.macros_per_portion?.portion_g ?? selectedItem.serving_size_g ?? 100;
-                      
-                      return (
-                        <>
-                          <Text style={styles.portionText}>{t('search.servingSize', { grams: Math.round(portionG) })}</Text>
-                          <View style={styles.detailMacrosGrid}>
-                            <View style={[styles.detailMacroCard, { backgroundColor: colors.primaryGlow }]}>
-                              <Text style={[styles.detailMacroVal, { color: colors.calories }]}>{Math.round(macros.calories)}</Text>
-                              <Text style={styles.detailMacroLabel}>{t('macro.kcal')}</Text>
-                            </View>
-                            {[
-                              { key: 'c', label: t('macro.carbs'), val: macros.carbs, color: colors.carbs },
-                              { key: 'p', label: t('macro.protein'), val: macros.protein, color: colors.protein },
-                              { key: 'f', label: t('macro.fat'), val: macros.fat, color: colors.fat },
-                            ].map((m) => (
-                              <View key={m.key} style={[styles.detailMacroCard, { backgroundColor: m.color + '20' }]}>
-                                <Text style={[styles.detailMacroVal, { color: m.color }]}>{Math.round(m.val)}g</Text>
-                                <Text style={styles.detailMacroLabel}>{m.label}</Text>
-                              </View>
-                            ))}
-                          </View>
-                        </>
-                      );
-                    })()}
-                  </View>
-
-                  {/* Recipe Ingredients */}
-                  {selectedItemSource === 'recipe' && (() => {
-                    const recipe = RECIPES_DB.find(r => r.id === selectedItem.id);
-                    if (recipe && recipe.ingredients) {
-                      const portion_g = selectedItem.macros_per_portion?.portion_g ?? recipe.total_weight_g;
-                      const factor = portion_g / recipe.total_weight_g;
-                      const scaled = recipe.ingredients.map(ing => ({
-                        name: ing.name,
-                        qty_g: ing.base_qty_g * factor
-                      }));
-
-                      return (
-                        <View style={styles.ingredientsSection}>
-                          <Text style={styles.detailSecTitle}>{t('search.ingredients', { grams: Math.round(portion_g) })}</Text>
-                          <View style={styles.ingredientsContainer}>
-                            {scaled.map((ing, idx) => (
-                              <View key={idx} style={styles.ingredientRow}>
-                                <View style={styles.bulletPoint} />
-                                <Text style={styles.ingredientText}>
-                                  <Text style={styles.ingredientQty}>{Math.round(ing.qty_g)}g</Text> {ing.name}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                        </View>
-                      );
-                    }
-                    return null;
-                  })()}
-
-                  <View style={styles.modalBtnRow}>
-                    <Pressable style={styles.modalCancelBtn} onPress={() => setDetailModalVisible(false)}>
-                      <Text style={styles.modalCancelText}>{t('common.close')}</Text>
-                    </Pressable>
-                    <Pressable style={styles.modalSaveBtn} onPress={() => { setDetailModalVisible(false); handleAddPress(selectedItem); }}>
-                      <Text style={styles.modalSaveText}>{t('search.logThisItem')}</Text>
-                    </Pressable>
-                  </View>
-                </ScrollView>
+                <View style={[styles.formRow, { borderTopWidth: 1, borderTopColor: colors.borderLight, paddingVertical: 0, height: 1 }]} />
+                <View style={styles.formRow}>
+                  <Text style={styles.inputLabel}>{t('search.restaurant')}</Text>
+                  <TextInput style={styles.formInput} placeholder={t('ph.exampleRestaurant')} placeholderTextColor={colors.textMuted} value={newItemRestaurant} onChangeText={setNewItemRestaurant} />
+                </View>
               </>
             )}
           </View>
-        </View>
-      </Modal>
+
+          <View style={styles.macrosGrid}>
+            <View style={styles.macroInputCell}>
+              <View style={[styles.macroInputIconContainer, { backgroundColor: colors.calories + '20' }]}>
+                <Ionicons name="flame" size={16} color={colors.calories} />
+              </View>
+              <Text style={styles.macroInputCellLabel}>{t('macro.calories')}</Text>
+              <TextInput style={styles.macroInputField} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={newItemCals} onChangeText={setNewItemCals} />
+              <Text style={styles.macroInputUnit}>kcal</Text>
+            </View>
+
+            <View style={styles.macroInputCell}>
+              <View style={[styles.macroInputIconContainer, { backgroundColor: colors.protein + '20' }]}>
+                <Ionicons name="fish" size={16} color={colors.protein} />
+              </View>
+              <Text style={styles.macroInputCellLabel}>{t('macro.protein')}</Text>
+              <TextInput style={styles.macroInputField} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={newItemProtein} onChangeText={setNewItemProtein} />
+              <Text style={styles.macroInputUnit}>g</Text>
+            </View>
+
+            <View style={styles.macroInputCell}>
+              <View style={[styles.macroInputIconContainer, { backgroundColor: colors.carbs + '20' }]}>
+                <Ionicons name="leaf" size={16} color={colors.carbs} />
+              </View>
+              <Text style={styles.macroInputCellLabel}>{t('macro.carbs')}</Text>
+              <TextInput style={styles.macroInputField} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={newItemCarbs} onChangeText={setNewItemCarbs} />
+              <Text style={styles.macroInputUnit}>g</Text>
+            </View>
+
+            <View style={styles.macroInputCell}>
+              <View style={[styles.macroInputIconContainer, { backgroundColor: colors.fat + '20' }]}>
+                <Ionicons name="water" size={16} color={colors.fat} />
+              </View>
+              <Text style={styles.macroInputCellLabel}>{t('macro.fat')}</Text>
+              <TextInput style={styles.macroInputField} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textMuted} value={newItemFat} onChangeText={setNewItemFat} />
+              <Text style={styles.macroInputUnit}>g</Text>
+            </View>
+          </View>
+
+          <View style={styles.modalBtnRow}>
+            <Pressable style={styles.ghostBtn} onPress={() => setModalVisible(false)}>
+              <Text style={styles.ghostBtnText}>{t('common.cancel')}</Text>
+            </Pressable>
+            <Pressable style={styles.modalSaveBtn} onPress={handleSaveCustomItem}>
+              <Text style={styles.modalSaveText}>{t('search.saveItem')}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </PlatformModal>
+
+      {/* Detail Modal */}
+      <PlatformModal visible={detailModalVisible} onClose={() => setDetailModalVisible(false)}>
+        {selectedItem && (
+          <>
+            <View style={styles.modalHeaderCenter}>
+               <View style={[styles.modalHeaderIconCircle, { backgroundColor: selectedItemSource === 'restaurant' ? colors.primaryGlow : selectedItemSource === 'recipe' ? colors.accent + '20' : colors.carbs + '20' }]}>
+                 <Ionicons name={selectedItemSource === 'restaurant' ? "fast-food" : selectedItemSource === 'recipe' ? "book" : "nutrition"} size={32} color={selectedItemSource === 'restaurant' ? colors.primary : selectedItemSource === 'recipe' ? colors.accent : colors.carbs} />
+               </View>
+               <Text style={[styles.modalTitle, { marginBottom: 0 }]}>{selectedItem.name}</Text>
+               <Text style={styles.modalSubtitle}>
+                 {selectedItemSource === 'recipe'
+                   ? t('search.srcRecipe', { country: selectedItem.country })
+                   : selectedItemSource === 'restaurant'
+                     ? t('search.srcRestaurant', { restaurant: selectedItem.restaurant_name })
+                     : t('search.srcFood', { category: selectedItem.category || t('search.categoryGeneral') })}
+               </Text>
+            </View>
+
+            <ScrollView 
+              showsVerticalScrollIndicator={false} 
+              contentContainerStyle={styles.modalScroll}
+              keyboardDismissMode="on-drag"
+              keyboardShouldPersistTaps="handled"
+            >
+              
+              {/* Macros Summary */}
+              <View style={styles.detailMacrosContainer}>
+                
+                {(() => {
+                  const macros = selectedItem.macros_per_portion ?? selectedItem.macros_per_100g ?? {
+                    calories: selectedItem.calories_per_100g ?? selectedItem.calories ?? 0,
+                    protein: selectedItem.protein_per_100g ?? selectedItem.protein ?? 0,
+                    carbs: selectedItem.carbs_per_100g ?? selectedItem.carbs ?? 0,
+                    fat: selectedItem.fat_per_100g ?? selectedItem.fat ?? 0
+                  };
+                  const portionG = selectedItem.macros_per_portion?.portion_g ?? selectedItem.serving_size_g ?? 100;
+                  
+                  return (
+                    <>
+                      <Text style={styles.detailSecTitle}>{t('search.macrosBreakdown')} • {t('search.servingSize', { grams: Math.round(portionG) })}</Text>
+                      <View style={styles.detailMacrosGrid}>
+                        <View style={[styles.detailMacroCard, { backgroundColor: colors.primaryGlow }]}>
+                          <Text style={[styles.detailMacroVal, { color: colors.calories, fontSize: FontSize.xxl }]}>{Math.round(macros.calories)}</Text>
+                          <Text style={styles.detailMacroLabel}>{t('macro.kcal')}</Text>
+                        </View>
+                        {[
+                          { key: 'c', label: t('macro.carbs'), val: macros.carbs, color: colors.carbs },
+                          { key: 'p', label: t('macro.protein'), val: macros.protein, color: colors.protein },
+                          { key: 'f', label: t('macro.fat'), val: macros.fat, color: colors.fat },
+                        ].map((m) => (
+                          <View key={m.key} style={[styles.detailMacroCard, { backgroundColor: m.color + '15' }]}>
+                            <Text style={[styles.detailMacroVal, { color: m.color, fontSize: FontSize.lg }]}>{Math.round(m.val)}g</Text>
+                            <Text style={styles.detailMacroLabel}>{m.label}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </>
+                  );
+                })()}
+              </View>
+
+              {/* Recipe Ingredients */}
+              {selectedItemSource === 'recipe' && (() => {
+                const recipe = RECIPES_DB.find(r => r.id === selectedItem.id);
+                if (recipe && recipe.ingredients) {
+                  const portion_g = selectedItem.macros_per_portion?.portion_g ?? recipe.total_weight_g;
+                  const factor = portion_g / recipe.total_weight_g;
+                  const scaled = recipe.ingredients.map(ing => ({
+                    name: ing.name,
+                    qty_g: ing.base_qty_g * factor
+                  }));
+
+                  return (
+                    <View style={styles.ingredientsSection}>
+                      <Text style={styles.detailSecTitle}>{t('search.ingredients', { grams: Math.round(portion_g) })}</Text>
+                      <View style={styles.ingredientsContainer}>
+                        {scaled.map((ing, idx) => (
+                          <View key={idx} style={styles.ingredientRow}>
+                            <View style={styles.bulletPoint} />
+                            <Text style={styles.ingredientText}>
+                              <Text style={styles.ingredientQty}>{Math.round(ing.qty_g)}g</Text> {ing.name}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  );
+                }
+                return null;
+              })()}
+
+              <View style={styles.modalBtnRow}>
+                <Pressable style={styles.ghostBtn} onPress={() => setDetailModalVisible(false)}>
+                  <Text style={styles.ghostBtnText}>{t('common.close')}</Text>
+                </Pressable>
+                <Pressable style={styles.modalSaveBtn} onPress={() => { setDetailModalVisible(false); handleAddPress(selectedItem); }}>
+                  <Text style={styles.modalSaveText}>{t('search.logThisItem')}</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </>
+        )}
+      </PlatformModal>
 
       {/* Meal Type Selection Modal */}
       <Modal visible={mealTypeModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
           <View style={styles.mealTypeModalCard}>
             <Text style={styles.modalTitle}>
               {pendingLogItem?.item ? t('search.selectMealType', { name: pendingLogItem.item.name }) : t('log.title')}
@@ -592,7 +718,6 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.extrabold, color: colors.textPrimary },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -640,9 +765,36 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   tabSegmentText: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.medium },
   tabSegmentTextActive: { color: colors.primary, fontWeight: FontWeight.bold },
   
-  actionRow: { flexDirection: 'row', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryGlow, paddingVertical: 10, borderRadius: Radius.md, gap: 6, borderWidth: 1, borderColor: colors.primary },
-  actionBtnText: { color: colors.primary, fontWeight: FontWeight.semibold, fontSize: FontSize.sm },
+  fabContainer: {
+    position: 'absolute',
+    bottom: Spacing.xl,
+    right: Spacing.xl,
+    gap: Spacing.md,
+    alignItems: 'center',
+  },
+  fab: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fabSecondary: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.bgElevated,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
 
   cardWrapper: { marginBottom: Spacing.md },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: -8, paddingRight: Spacing.md, gap: 4 },
@@ -654,17 +806,42 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   list: { padding: Spacing.lg },
 
   // Modal Styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: colors.bgCard, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, maxHeight: '80%' },
-  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: Spacing.md },
-  modalScroll: { gap: Spacing.sm },
-  inputLabel: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.medium, marginTop: 4 },
-  modalInput: { backgroundColor: colors.bgInput, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: Spacing.md, color: colors.textPrimary, fontSize: FontSize.md },
-  modalBtnRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
-  modalCancelBtn: { flex: 1, padding: Spacing.md, borderRadius: Radius.md, alignItems: 'center', backgroundColor: colors.bgElevated },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContent: { 
+    backgroundColor: colors.bgCard, 
+    borderTopLeftRadius: 32, 
+    borderTopRightRadius: 32, 
+    padding: Spacing.xl, 
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 24,
+  },
+  iosPageSheetContent: {
+    flex: 1,
+    backgroundColor: colors.bgCard,
+    padding: Spacing.xl,
+  },
+  modalTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.extrabold, color: colors.textPrimary, marginBottom: Spacing.lg, textAlign: 'center' },
+  modalScroll: { gap: Spacing.md, paddingBottom: Spacing.xl },
+  inputLabel: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  modalInput: { 
+    backgroundColor: colors.bgElevated, 
+    borderWidth: 1, 
+    borderColor: 'transparent',
+    borderRadius: Radius.lg, 
+    padding: Spacing.md, 
+    color: colors.textPrimary, 
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.medium,
+  },
+  modalBtnRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.xl },
+  modalCancelBtn: { flex: 1, padding: Spacing.md, borderRadius: Radius.full, alignItems: 'center', backgroundColor: colors.bgElevated },
   modalCancelText: { color: colors.textPrimary, fontWeight: FontWeight.bold },
-  modalSaveBtn: { flex: 1, padding: Spacing.md, borderRadius: Radius.md, alignItems: 'center', backgroundColor: colors.primary },
-  modalSaveText: { color: colors.textInverse, fontWeight: FontWeight.bold },
+  modalSaveBtn: { flex: 1, padding: Spacing.md, borderRadius: Radius.full, alignItems: 'center', backgroundColor: colors.primary, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+  modalSaveText: { color: '#FFFFFF', fontWeight: FontWeight.bold },
 
   // Details Modal Specific Styles
   detailRow: {
@@ -753,16 +930,16 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   
   // Meal Type Modal Styles
   mealTypeModalCard: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: Radius.lg,
-    padding: Spacing.xl,
-    width: '85%',
-    maxWidth: 360,
+    backgroundColor: colors.bgCard,
+    borderRadius: 32,
+    padding: Spacing.xxl,
+    width: '90%',
+    maxWidth: 400,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 12,
   },
   mealTypeOption: {
     flexDirection: 'row',
@@ -794,5 +971,124 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
     color: colors.error,
+  },
+
+  // Impeccable Form Layout
+  formGroup: {
+    backgroundColor: colors.bgElevated,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  formRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  formInput: {
+    flex: 1,
+    fontSize: FontSize.md,
+    color: colors.textPrimary,
+    textAlign: 'right',
+    paddingVertical: 4,
+    paddingHorizontal: Spacing.sm,
+    backgroundColor: colors.bgInput,
+    borderRadius: Radius.sm,
+    marginLeft: Spacing.md,
+  },
+  macrosGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.lg,
+    gap: 8,
+  },
+  macroInputCell: {
+    flex: 1,
+    backgroundColor: colors.bgElevated,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: 2,
+    alignItems: 'center',
+  },
+  macroInputIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  macroInputCellLabel: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontWeight: FontWeight.bold,
+    textTransform: 'uppercase',
+  },
+  macroInputField: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.extrabold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    width: '100%',
+    padding: 0,
+    marginTop: -2,
+  },
+  macroInputUnit: {
+    fontSize: 10,
+    color: colors.textMuted,
+    marginTop: -4,
+  },
+  modalHeaderCenter: {
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+    paddingTop: Spacing.sm,
+  },
+  modalHeaderIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalSubtitle: {
+    fontSize: FontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  modalHeaderCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+    gap: Spacing.md,
+  },
+  modalHeaderIconCompact: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalTitleCompact: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.extrabold,
+    color: colors.textPrimary,
+  },
+  modalSubtitleCompact: {
+    fontSize: FontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  ghostBtn: {
+    flex: 1,
+    padding: Spacing.md,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+  },
+  ghostBtnText: {
+    color: colors.textSecondary,
+    fontWeight: FontWeight.bold,
   },
 });

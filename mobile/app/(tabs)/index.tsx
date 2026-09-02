@@ -198,15 +198,7 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Absolute Background Gradient (hide in dark mode or make very subtle) */}
-      {!isDark && (
-        <ExpoImage
-          source={require('../../assets/dashboard_bg.jpeg')}
-          style={styles.bgImage}
-          contentFit="cover"
-        />
-      )}
-
+      <ExpoImage source={require('../../assets/dashboard_bg.jpeg')} style={styles.bgImage} contentFit="cover" />
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
@@ -222,56 +214,53 @@ export default function DashboardScreen() {
         <View ref={scrollContentRef} style={{ flex: 1 }}>
           {/* Header */}
           <View style={[styles.headerWrapper, { paddingTop: insets.top + Spacing.lg }]}>
-          <View style={styles.header}>
-            {/* NOKMA brand title */}
-            <Text style={styles.nokmaTitle}>NOKMA</Text>
-          </View>
-
-          {/* Coach Guide — mascot + speech bubble with greeting + date inside */}
-          <View ref={coachRef}>
-            <Animated.View
-              style={{
-                opacity: coachCardAnim,
-                transform: [
-                  {
-                    translateY: coachCardAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-20, 0],
-                    }),
-                  },
-                ],
-              }}
-            >
-              <CoachGuide
-                message={displayMessage}
-                visible
-                greeting={`${coach.greeting.replace(/,.*$/, '')}, ${firstName}!`}
-                date={today}
-              />
-            </Animated.View>
-          </View>
-        </View>
-
-        {/* Layered White Content Card */}
-        <View style={styles.contentCard}>
-          {/* Top Row: Calorie Ring & Quick Actions */}
-          <View ref={trackerRef} style={styles.topDashboardRow}>
-            <View style={styles.ringCard}>
-              <CalorieRing consumed={totals.calories} target={caloriesTarget} size={150} />
+            <View style={styles.header}>
+              <Text style={styles.nokmaTitle}>NOKMA</Text>
             </View>
-            <View style={styles.quickActionsCol}>
-              <View ref={fabRef}>
-                <Pressable style={styles.quickActionBtn} onPress={() => router.push('/(tabs)/log')}>
-                  <Ionicons name="restaurant" size={20} color={colors.primary} />
-                  <Text style={styles.quickActionText}>{t('dash.logAMeal')}</Text>
-                </Pressable>
+
+            <View ref={coachRef}>
+              <Animated.View
+                style={{
+                  opacity: coachCardAnim,
+                  transform: [
+                    {
+                      translateY: coachCardAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-20, 0],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <CoachGuide
+                  message={displayMessage}
+                  visible
+                  greeting={`${coach.greeting.replace(/,.*$/, '')}, ${firstName}!`}
+                  date={today}
+                />
+              </Animated.View>
+            </View>
+          </View>
+
+          <View style={styles.contentCard}>
+            {/* Hero Section */}
+            <View ref={trackerRef} style={styles.ringCard}>
+              <View style={styles.topDashboardRow}>
+                <CalorieRing consumed={totals.calories} target={caloriesTarget} size={150} />
+                <View style={styles.quickActionsCol}>
+                  <View ref={fabRef}>
+                    <Pressable style={[styles.quickActionBtn, styles.primaryActionBtn]} onPress={() => router.push('/(tabs)/log')}>
+                      <Ionicons name="restaurant" size={20} color="#FFFFFF" />
+                      <Text style={[styles.quickActionText, { color: '#FFFFFF' }]}>{t('dash.logAMeal')}</Text>
+                    </Pressable>
+                  </View>
+                  <Pressable style={styles.quickActionBtn} onPress={() => router.push('/(tabs)/search')}>
+                    <Ionicons name="search" size={20} color={colors.textPrimary} />
+                    <Text style={styles.quickActionText}>{t('search.title')}</Text>
+                  </Pressable>
+                </View>
               </View>
-              <Pressable style={styles.quickActionBtn} onPress={() => router.push('/(tabs)/search')}>
-                <Ionicons name="search" size={20} color={colors.primary} />
-                <Text style={styles.quickActionText}>{t('search.title')}</Text>
-              </Pressable>
             </View>
-          </View>
 
             {/* Steps KPI */}
             {dailySteps > 0 && (
@@ -351,20 +340,18 @@ export default function DashboardScreen() {
                 style={[
                   styles.streakWidgetCard,
                   {
-                    backgroundColor: streakInfo.levelName === 'Inferno' ? '#FF4B2B' :
-                                     streakInfo.levelName === 'Ignite'  ? '#f12711' :
-                                     streakInfo.levelName === 'Blaze'   ? '#FF512F' :
-                                     streakInfo.levelName === 'Glow'    ? '#FF8008' :
-                                     '#E2E8F0' // Spark or none
+                    backgroundColor: streakInfo.levelName === 'Spark' ? colors.bgElevated : colors.primary,
+                    borderWidth: streakInfo.levelName === 'Spark' ? 1 : 0,
+                    borderColor: colors.border,
                   }
                 ]}
               >
                 <View style={styles.streakWidgetRow}>
                   <View style={styles.streakWidgetInfo}>
-                    <Text style={[styles.streakWidgetTitle, streakInfo.levelName === 'Spark' && {color: '#1E293B'}]}>
+                    <Text style={[styles.streakWidgetTitle, streakInfo.levelName === 'Spark' && {color: colors.textPrimary}]}>
                       {streakInfo.currentStreak} Day Streak
                     </Text>
-                    <Text style={[styles.streakWidgetSubtitle, streakInfo.levelName === 'Spark' && {color: '#475569'}]}>
+                    <Text style={[styles.streakWidgetSubtitle, streakInfo.levelName === 'Spark' && {color: colors.textSecondary}]}>
                       {streakInfo.levelName} Level
                     </Text>
                   </View>
@@ -385,7 +372,7 @@ export default function DashboardScreen() {
                         <View key={entry.date} style={styles.miniHeatmapCell}>
                           <Text style={[
                             styles.streakWidgetDayLabel,
-                            streakInfo.levelName === 'Spark' && {color: '#475569'},
+                            streakInfo.levelName === 'Spark' && {color: colors.textSecondary},
                             isToday && { fontWeight: FontWeight.bold },
                           ]}>{dayLabel}</Text>
                           <View style={[
@@ -395,9 +382,9 @@ export default function DashboardScreen() {
                               borderColor: entry.quality > 0 ? dotColor : 'rgba(255,255,255,0.4)',
                             },
                             streakInfo.levelName === 'Spark' && entry.quality === 0 && {
-                              backgroundColor: 'rgba(0,0,0,0.05)', borderColor: 'rgba(0,0,0,0.1)'
+                              backgroundColor: colors.bgCard, borderColor: colors.border
                             },
-                            isToday && { borderColor: streakInfo.levelName === 'Spark' ? '#0F172A' : '#FFF', borderWidth: 2 },
+                            isToday && { borderColor: streakInfo.levelName === 'Spark' ? colors.textPrimary : '#FFF', borderWidth: 2 },
                           ]}>
                             {entry.quality >= 2 && (
                               <Text style={styles.miniHeatmapEmoji}>
@@ -429,6 +416,13 @@ export default function DashboardScreen() {
 
 const getStyles = (colors: ThemeColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  bgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 480, // Covers upper portion, creating the sky/gradient look
+  },
   // ── 7-day mini heatmap ────────────────────────────────────────────────────
   miniHeatmapRow: {
     flexDirection: 'row',
@@ -516,13 +510,6 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bgImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 480, // Covers upper portion, creating the sky/gradient look
-  },
   scrollContent: {
     flexGrow: 1,
   },
@@ -607,17 +594,29 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   quickActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
-    backgroundColor: colors.primaryGlow,
-    paddingVertical: 12,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.lg,
+    backgroundColor: colors.bgElevated,
+    paddingVertical: 16,
+    borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: 'rgba(232,162,84,0.3)',
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  primaryActionBtn: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
   },
   quickActionText: {
     fontSize: FontSize.sm,
-    color: colors.primary,
+    color: colors.textPrimary,
     fontWeight: FontWeight.bold,
   },
   stepsCard: {

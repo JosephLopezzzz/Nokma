@@ -11,6 +11,7 @@ import {
   Animated,
   Alert,
   BackHandler,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -124,6 +125,7 @@ export default function CoachOnboarding() {
   const [form, setForm] = useState<FormData>(emptyForm);
   const [typingDone, setTypingDone] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
 
@@ -172,6 +174,7 @@ export default function CoachOnboarding() {
   const goToStep = useCallback(
     (next: number) => {
       setTypingDone(false);
+      setValidationError(null);
       const isForward = next > step;
       Animated.parallel([
         Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
@@ -192,34 +195,34 @@ export default function CoachOnboarding() {
   const validateCurrent = (): boolean => {
     const s = STEPS[step];
     if (s === 'welcome' && !form.name.trim()) {
-      Alert.alert('', t('validation.name'));
+      setValidationError(t('validation.name'));
       return false;
     }
     if (s === 'age') {
       const age = parseInt(form.age, 10);
       if (!form.age || !validateAge(age)) {
-        Alert.alert('', t('validation.age'));
+        setValidationError(t('validation.age'));
         return false;
       }
     }
     if (s === 'sex' && !form.sex) {
-      Alert.alert('', t('validation.required') || 'Please select an option');
+      setValidationError(t('validation.required') || 'Please select an option');
       return false;
     }
     if (s === 'height_weight') {
       const h = parseFloat(form.heightValue);
       const w = parseFloat(form.weightValue);
       if (!form.heightValue || !validateHeight(convertHeight(h, form.heightUnit))) {
-        Alert.alert('', t('validation.height'));
+        setValidationError(t('validation.height'));
         return false;
       }
       if (!form.weightValue || !validateWeight(convertWeight(w, form.weightUnit))) {
-        Alert.alert('', t('validation.weight'));
+        setValidationError(t('validation.weight'));
         return false;
       }
     }
     if (s === 'activity' && form.activityLevel === '') {
-      Alert.alert('', t('validation.required') || 'Please select an option');
+      setValidationError(t('validation.required') || 'Please select an option');
       return false;
     }
     return true;
@@ -394,6 +397,7 @@ export default function CoachOnboarding() {
               onTypeDone={() => setTypingDone(true)}
               stepKey="welcome"
               bubbleRef={bubbleRef}
+              validationError={validationError}
             >
               <TextInput
                 style={styles.inputCard}
@@ -415,6 +419,7 @@ export default function CoachOnboarding() {
               onTypeDone={() => setTypingDone(true)}
               stepKey="age"
               bubbleRef={bubbleRef}
+              validationError={validationError}
             >
               <TextInput
                 style={styles.inputCardCentered}
@@ -438,6 +443,7 @@ export default function CoachOnboarding() {
               onTypeDone={() => setTypingDone(true)}
               stepKey="sex"
               bubbleRef={bubbleRef}
+              validationError={validationError}
             >
               <View style={styles.optionsStack}>
                 {['male', 'female'].map((s) => (
@@ -469,6 +475,7 @@ export default function CoachOnboarding() {
               onTypeDone={() => setTypingDone(true)}
               stepKey="height_weight"
               bubbleRef={bubbleRef}
+              validationError={validationError}
             >
               <View style={styles.dualRow}>
                 <View style={styles.dualField}>
@@ -520,6 +527,7 @@ export default function CoachOnboarding() {
               onTypeDone={() => setTypingDone(true)}
               stepKey="feedback"
               bubbleRef={bubbleRef}
+              validationError={validationError}
             >
               {typingDone && (
                 <PrimaryBtn label={getContinueLabel(lang)} onPress={() => goToStep(step + 1)} />
@@ -538,6 +546,7 @@ export default function CoachOnboarding() {
               onTypeDone={() => setTypingDone(true)}
               stepKey="goal"
               bubbleRef={bubbleRef}
+              validationError={validationError}
             >
               <View style={styles.optionsStack}>
                 {goalKeys.map((g) => {
@@ -580,6 +589,7 @@ export default function CoachOnboarding() {
               onTypeDone={() => setTypingDone(true)}
               stepKey="activity"
               bubbleRef={bubbleRef}
+              validationError={validationError}
             >
               <View style={styles.optionsStack}>
                 {[1, 2, 3, 4, 5].map((lvl) => (
@@ -622,6 +632,7 @@ export default function CoachOnboarding() {
               onTypeDone={() => setTypingDone(true)}
               stepKey="health"
               bubbleRef={bubbleRef}
+              validationError={validationError}
             >
               {typingDone && (
                 <View style={styles.optionsStack}>
@@ -693,6 +704,7 @@ export default function CoachOnboarding() {
               onTypeDone={() => setTypingDone(true)}
               stepKey="allergies"
               bubbleRef={bubbleRef}
+              validationError={validationError}
             >
               {typingDone && (
                 <View style={styles.optionsStack}>
@@ -770,11 +782,12 @@ export default function CoachOnboarding() {
               onTypeDone={() => setTypingDone(true)}
               stepKey="finish"
               bubbleRef={bubbleRef}
+              validationError={validationError}
             >
               {typingDone && (
                 <>
                   <ReviewSummary form={form} lang={lang} />
-                  <PrimaryBtn label={getGoToDashboardLabel(lang)} onPress={finishOnboarding} />
+                  <PrimaryBtn label={getGoToDashboardLabel(lang)} onPress={finishOnboarding} isLoading={saving} />
                 </>
               )}
             </StepContent>
@@ -795,17 +808,26 @@ export default function CoachOnboarding() {
   );
 }
 
-function PrimaryBtn({ label, onPress }: { label: string; onPress: () => void }) {
+function PrimaryBtn({ label, onPress, isLoading }: { label: string; onPress: () => void; isLoading?: boolean }) {
   return (
     <Pressable
       style={({ pressed }) => [
         styles.primaryBtn,
-        pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+        pressed && !isLoading && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+        isLoading && { opacity: 0.7 }
       ]}
-      onPress={onPress}
+      onPress={() => {
+        if (!isLoading) onPress();
+      }}
     >
-      <Text style={styles.primaryBtnText}>{label}</Text>
-      <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 8 }} />
+      {isLoading ? (
+        <ActivityIndicator color="#FFFFFF" />
+      ) : (
+        <>
+          <Text style={styles.primaryBtnText}>{label}</Text>
+          <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 8 }} />
+        </>
+      )}
     </Pressable>
   );
 }
@@ -841,6 +863,7 @@ function StepContent({
   stepKey,
   children,
   bubbleRef,
+  validationError,
 }: {
   coachMessage: string;
   typingDone: boolean;
@@ -848,8 +871,10 @@ function StepContent({
   stepKey: string;
   children: React.ReactNode;
   bubbleRef?: React.RefObject<CoachBubbleHandle>;
+  validationError?: string | null;
 }) {
   const getMascotState = (s: string) => {
+    if (validationError) return 'worry';
     switch (s) {
       case 'welcome': return 'flex';
       case 'age': return 'idle';
@@ -869,7 +894,7 @@ function StepContent({
     <View key={stepKey} style={styles.stepContent}>
       <CoachBubble
         ref={bubbleRef}
-        message={coachMessage}
+        message={validationError || coachMessage}
         typewriter
         typewriterSpeed={15}
         onTypeComplete={onTypeDone}

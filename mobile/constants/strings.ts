@@ -41,8 +41,9 @@ export const STRINGS = {
 
   // Input placeholders. Example values stay recognisable in both languages.
   'ph.exampleName':       ['e.g. Protein Bar', 'hal. Protein Bar'],
-  'ph.exampleMenuItem':   ['e.g. 1pc Chickenjoy', 'hal. 1pc Chickenjoy'],
-  'ph.exampleRestaurant': ['e.g. Jollibee', 'hal. Jollibee'],
+  'ph.exampleMenuItem':   ['e.g. 1pc Chicken Inasal', 'hal. 1pc Chicken Inasal'],
+  'ph.exampleCustomFood': ['e.g. Chicken Adobo', 'hal. Chicken Adobo'],
+  'ph.exampleRestaurant': ['e.g. Mang Inasal', 'hal. Mang Inasal'],
   'ph.exampleGrams':      ['e.g. 150', 'hal. 150'],
   'ph.exampleBones':      ['e.g. 20', 'hal. 20'],
 
