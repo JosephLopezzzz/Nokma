@@ -5,11 +5,12 @@ import {
   PanResponder, Animated, KeyboardAvoidingView, Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { foodsApi, recipesApi, recommendApi, RECIPES_DB } from '../../services/api';
 import { findAllergenMatches } from '../../services/allergenService';
 import FoodCard from '../../components/FoodCard';
+import ScannerCamera from '../../components/ScannerCamera';
+import { ProgressiveNutritionData } from '../../services/nutritionScanner';
 import { FontSize, FontWeight, Spacing, Radius, MEAL_TYPES, ThemeColors } from '../../constants/theme';
 import type { Food, Recipe, RestaurantFood } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
@@ -17,6 +18,7 @@ import AnimatedPressable from '../../components/AnimatedPressable';
 import { useAuth } from '../../context/AuthContext';
 import { useMeals } from '../../context/MealContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useToast } from '../../context/ToastContext';
 import { getMealTypeLabel, labelForOptionKey } from '../../constants/i18n';
 import type { StringKey } from '../../constants/strings';
 
@@ -117,6 +119,7 @@ export default function SearchScreen() {
   const { logMeal, remaining, targets, meals } = useMeals();
   const { lang, t } = useLanguage();
   const { colors } = useTheme();
+  const { showToast } = useToast();
   const styles = React.useMemo(() => getStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const [query,       setQuery]       = useState('');
@@ -129,10 +132,17 @@ export default function SearchScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemRestaurant, setNewItemRestaurant] = useState('');
+  const [newItemServing, setNewItemServing] = useState('');
   const [newItemCals, setNewItemCals] = useState('');
   const [newItemProtein, setNewItemProtein] = useState('');
   const [newItemCarbs, setNewItemCarbs] = useState('');
   const [newItemFat, setNewItemFat] = useState('');
+  const [saving, setSaving] = useState(false);
+  /** Set when the form was prefilled by a scan, so we can prompt the user to verify. */
+  const [scanNotice, setScanNotice] = useState<'estimate' | 'read' | null>(null);
+
+  // Scanner State
+  const [showScanner, setShowScanner] = useState(false);
 
   // Details Modal State
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -210,66 +220,105 @@ export default function SearchScreen() {
     setQuery('');
   }, [activeTab]);
 
-  const handleScanMenu = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(t('ocr.permissionDenied'), t('ocr.cameraRequiredMenu'));
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
-    if (!result.canceled) {
-      Alert.alert(
-        t('ocr.simulatedTitle'),
-        t('ocr.simulatedMenuBody'),
-        [
-          { text: t('common.ok'), onPress: () => {
-              setNewItemName('');
-              setNewItemRestaurant(t('search.scannedMenuItem'));
-              setModalVisible(true);
-          }}
-        ]
-      );
-    }
+  const resetForm = () => {
+    setNewItemName(''); setNewItemRestaurant(''); setNewItemServing('');
+    setNewItemCals(''); setNewItemProtein(''); setNewItemCarbs(''); setNewItemFat('');
+    setScanNotice(null);
+  };
+
+  const closeAddModal = () => {
+    setModalVisible(false);
+    resetForm();
+  };
+
+  const handleMenuScanned = (data: ProgressiveNutritionData) => {
+    setShowScanner(false);
+
+    const num = (v: number | null | undefined) =>
+      v === null || v === undefined ? '' : String(Math.round(v));
+
+    setNewItemName(data.product_name ?? '');
+    setNewItemRestaurant(data.restaurant_name ?? t('search.customFastFood'));
+    setNewItemServing(num(data.serving_size?.value));
+    setNewItemCals(num(data.nutrition.calories?.value));
+    setNewItemProtein(num(data.nutrition.protein?.value));
+    setNewItemCarbs(num(data.nutrition.total_carbohydrates?.value));
+    setNewItemFat(num(data.nutrition.total_fat?.value));
+    setScanNotice(data.is_estimate ? 'estimate' : 'read');
+
+    // Land in the editable form rather than saving directly — scanned macros are
+    // a starting point, not a source of truth.
+    setModalVisible(true);
   };
 
   const handleSaveCustomItem = async () => {
-    if (!newItemName) return Alert.alert(t('common.error'), t('search.nameRequired'));
+    const name = newItemName.trim();
+    if (!name) return Alert.alert(t('common.error'), t('search.nameRequired'));
 
-    if (activeTab === 'restaurant') {
-      await recommendApi.createFastFood({
-        name: newItemName,
-        restaurant_name: newItemRestaurant || t('search.customFastFood'),
-        calories: parseFloat(newItemCals) || 0,
-        protein: parseFloat(newItemProtein) || 0,
-        carbs: parseFloat(newItemCarbs) || 0,
-        fat: parseFloat(newItemFat) || 0,
-        serving_size_g: 100,
-        country: user?.country || 'PH'
-      });
-    } else {
-      await foodsApi.create({
-        name: newItemName,
-        category: 'custom',
-        calories_per_100g: parseFloat(newItemCals) || 0,
-        protein_per_100g: parseFloat(newItemProtein) || 0,
-        carbs_per_100g: parseFloat(newItemCarbs) || 0,
-        fat_per_100g: parseFloat(newItemFat) || 0,
-        is_raw: false,
-        source: 'User'
-      });
+    const calories = parseFloat(newItemCals) || 0;
+    if (calories <= 0) return Alert.alert(t('common.error'), t('search.caloriesRequired'));
+
+    setSaving(true);
+    try {
+      if (activeTab === 'restaurant') {
+        await recommendApi.createFastFood({
+          name,
+          restaurant_name: newItemRestaurant.trim() || t('search.customFastFood'),
+          calories,
+          protein: parseFloat(newItemProtein) || 0,
+          carbs: parseFloat(newItemCarbs) || 0,
+          fat: parseFloat(newItemFat) || 0,
+          serving_size_g: parseFloat(newItemServing) || 100,
+          country: user?.country || 'PH'
+        });
+      } else {
+        await foodsApi.create({
+          name,
+          category: 'custom',
+          calories_per_100g: calories,
+          protein_per_100g: parseFloat(newItemProtein) || 0,
+          carbs_per_100g: parseFloat(newItemCarbs) || 0,
+          fat_per_100g: parseFloat(newItemFat) || 0,
+          is_raw: false,
+          source: 'User'
+        });
+      }
+      showToast({ type: 'success', title: t('search.savedTitle'), subtitle: t('search.savedBody', { name }) });
+      closeAddModal();
+      search(query);
+    } catch (err: any) {
+      console.error('[Search] Save failed:', err);
+      showToast({ type: 'error', title: t('search.saveFailed'), subtitle: err?.message ?? '' });
+    } finally {
+      setSaving(false);
     }
-    setModalVisible(false);
-    setNewItemName(''); setNewItemRestaurant(''); setNewItemCals(''); setNewItemProtein(''); setNewItemCarbs(''); setNewItemFat('');
-    search(query);
   };
 
-  const handleDelete = async (id: string, isFastFood: boolean) => {
-    if (isFastFood) {
-      await recommendApi.deleteCustomFastFood(id);
-    } else {
-      await foodsApi.deleteCustomFood(id);
-    }
-    search(query);
+  const handleDelete = (id: string, isFastFood: boolean, name: string) => {
+    Alert.alert(
+      t('search.deleteConfirmTitle', { name }),
+      t('search.deleteConfirmBody'),
+      [
+        { text: t('common.cancel'), style: 'cancel' as const },
+        {
+          text: t('common.delete'),
+          style: 'destructive' as const,
+          onPress: async () => {
+            try {
+              if (isFastFood) {
+                await recommendApi.deleteCustomFastFood(id);
+              } else {
+                await foodsApi.deleteCustomFood(id);
+              }
+              search(query);
+            } catch (err: any) {
+              console.error('[Search] Delete failed:', err);
+              showToast({ type: 'error', title: t('search.deleteFailed'), subtitle: err?.message ?? '' });
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleAddPress = (item: any) => {
@@ -344,7 +393,7 @@ export default function SearchScreen() {
             onAdd={() => handleAddPress(item)}
           />
           {isCustom && (
-            <Pressable style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]} onPress={() => handleDelete(item.id, false)}>
+            <Pressable style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]} onPress={() => handleDelete(item.id, false, item.name)}>
               <Ionicons name="trash" size={16} color={colors.error} />
               <Text style={styles.deleteBtnText}>{t('search.deleteCustomFood')}</Text>
             </Pressable>
@@ -368,7 +417,7 @@ export default function SearchScreen() {
           onAdd={() => handleAddPress(item)}
         />
         {isCustomFF && (
-          <Pressable style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]} onPress={() => handleDelete(item.id, true)}>
+          <Pressable style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]} onPress={() => handleDelete(item.id, true, item.name)}>
             <Ionicons name="trash" size={16} color={colors.error} />
             <Text style={styles.deleteBtnText}>{t('search.deleteFastFood')}</Text>
           </Pressable>
@@ -454,7 +503,7 @@ export default function SearchScreen() {
       {/* Floating Action Button (FAB) */}
       <View style={styles.fabContainer}>
         {activeTab === 'restaurant' && (
-          <AnimatedPressable style={[styles.fab, styles.fabSecondary]} onPress={handleScanMenu} scaleTo={0.9}>
+          <AnimatedPressable style={[styles.fab, styles.fabSecondary]} onPress={() => setShowScanner(true)} scaleTo={0.9}>
             <Ionicons name="scan" size={24} color={colors.textPrimary} />
           </AnimatedPressable>
         )}
@@ -463,8 +512,15 @@ export default function SearchScreen() {
         </AnimatedPressable>
       </View>
 
+      <ScannerCamera
+        visible={showScanner}
+        mode="menu"
+        onClose={() => setShowScanner(false)}
+        onCapture={handleMenuScanned}
+      />
+
       {/* Add Custom Item Modal */}
-      <PlatformModal visible={modalVisible} onClose={() => setModalVisible(false)}>
+      <PlatformModal visible={modalVisible} onClose={closeAddModal}>
         <View style={styles.modalHeaderCompact}>
            <View style={[styles.modalHeaderIconCompact, { backgroundColor: activeTab === 'restaurant' ? colors.primaryGlow : colors.carbs + '20' }]}>
              <Ionicons name={activeTab === 'restaurant' ? "fast-food" : "nutrition"} size={24} color={activeTab === 'restaurant' ? colors.primary : colors.carbs} />
@@ -485,15 +541,31 @@ export default function SearchScreen() {
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
         >
+          {scanNotice && (
+            <View style={styles.scanNotice}>
+              <Ionicons
+                name={scanNotice === 'estimate' ? 'sparkles' : 'scan'}
+                size={18}
+                color={colors.primary}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.scanNoticeTitle}>{t('search.scanReviewTitle')}</Text>
+                <Text style={styles.scanNoticeBody}>
+                  {scanNotice === 'estimate' ? t('search.scanEstimateHint') : t('search.scanReadHint')}
+                </Text>
+              </View>
+            </View>
+          )}
+
           <View style={styles.formGroup}>
             <View style={styles.formRow}>
               <Text style={styles.inputLabel}>{t('search.name')}</Text>
-              <TextInput 
-                style={styles.formInput} 
-                placeholder={activeTab === 'restaurant' ? t('ph.exampleMenuItem') : t('ph.exampleCustomFood')} 
-                placeholderTextColor={colors.textMuted} 
-                value={newItemName} 
-                onChangeText={setNewItemName} 
+              <TextInput
+                style={styles.formInput}
+                placeholder={activeTab === 'restaurant' ? t('ph.exampleMenuItem') : t('ph.exampleCustomFood')}
+                placeholderTextColor={colors.textMuted}
+                value={newItemName}
+                onChangeText={setNewItemName}
               />
             </View>
 
@@ -503,6 +575,19 @@ export default function SearchScreen() {
                 <View style={styles.formRow}>
                   <Text style={styles.inputLabel}>{t('search.restaurant')}</Text>
                   <TextInput style={styles.formInput} placeholder={t('ph.exampleRestaurant')} placeholderTextColor={colors.textMuted} value={newItemRestaurant} onChangeText={setNewItemRestaurant} />
+                </View>
+                <View style={[styles.formRow, { borderTopWidth: 1, borderTopColor: colors.borderLight, paddingVertical: 0, height: 1 }]} />
+                <View style={styles.formRow}>
+                  <Text style={styles.inputLabel}>{t('search.servingSizeLabel')}</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    keyboardType="decimal-pad"
+                    placeholder="100"
+                    placeholderTextColor={colors.textMuted}
+                    value={newItemServing}
+                    onChangeText={setNewItemServing}
+                  />
+                  <Text style={styles.formInputSuffix}>g</Text>
                 </View>
               </>
             )}
@@ -547,11 +632,20 @@ export default function SearchScreen() {
           </View>
 
           <View style={styles.modalBtnRow}>
-            <AnimatedPressable style={styles.ghostBtn} onPress={() => setModalVisible(false)} scaleTo={0.95}>
+            <AnimatedPressable style={styles.ghostBtn} onPress={closeAddModal} scaleTo={0.95} disabled={saving}>
               <Text style={styles.ghostBtnText}>{t('common.cancel')}</Text>
             </AnimatedPressable>
-            <AnimatedPressable style={styles.modalSaveBtn} onPress={handleSaveCustomItem} scaleTo={0.95}>
-              <Text style={styles.modalSaveText}>{t('search.saveItem')}</Text>
+            <AnimatedPressable
+              style={[styles.modalSaveBtn, saving && { opacity: 0.6 }]}
+              onPress={handleSaveCustomItem}
+              scaleTo={0.95}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.modalSaveText}>{t('search.saveItem')}</Text>
+              )}
             </AnimatedPressable>
           </View>
         </ScrollView>
@@ -996,6 +1090,32 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.bgInput,
     borderRadius: Radius.sm,
     marginLeft: Spacing.md,
+  },
+  formInputSuffix: {
+    fontSize: FontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: FontWeight.bold,
+    marginLeft: Spacing.xs,
+  },
+  scanNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: colors.primaryGlow,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  scanNoticeTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: colors.textPrimary,
+  },
+  scanNoticeBody: {
+    fontSize: FontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+    lineHeight: 16,
   },
   macrosGrid: {
     flexDirection: 'row',
