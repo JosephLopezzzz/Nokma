@@ -33,6 +33,8 @@ export const STRINGS = {
   'common.notSet':         ['Not set', 'Hindi nakatakda'],
   'common.tapToSkip':      ['Tap to skip', 'I-tap para laktawan'],
   'common.close':          ['Close', 'Isara'],
+  'common.edit':           ['Edit', 'Baguhin'],
+  'common.select':         ['Select', 'Pumili'],
   /** Joiner for two-item lists, e.g. "Lunch and Dinner". Spaces are added by the caller. */
   'common.and':            ['and', 'at'],
 

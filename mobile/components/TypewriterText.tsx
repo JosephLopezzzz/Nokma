@@ -8,13 +8,19 @@ export interface TypewriterTextHandle {
 interface TypewriterTextProps {
   text: string;
   speed?: number;
+  /** When true, dynamically adjusts character speed based on text length */
+  adaptiveSpeed?: boolean;
+  /** Optional cap on total typing duration in ms */
+  maxDuration?: number;
   style?: any;
   onComplete?: () => void;
 }
 
 const TypewriterText = forwardRef<TypewriterTextHandle, TypewriterTextProps>(({
   text,
-  speed = 25,
+  speed = 20,
+  adaptiveSpeed = false,
+  maxDuration,
   style,
   onComplete,
 }, ref) => {
@@ -22,6 +28,24 @@ const TypewriterText = forwardRef<TypewriterTextHandle, TypewriterTextProps>(({
   const indexRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const doneRef = useRef(false);
+
+  // Compute effective typing delay per character
+  const effectiveSpeed = React.useMemo(() => {
+    let s = speed;
+    if (adaptiveSpeed) {
+      const len = text.length;
+      if (len <= 70) s = 16;
+      else if (len <= 130) s = 13;
+      else s = 11;
+    }
+    if (maxDuration && text.length > 0) {
+      const totalEstimated = s * text.length;
+      if (totalEstimated > maxDuration) {
+        s = Math.max(8, Math.floor(maxDuration / text.length));
+      }
+    }
+    return s;
+  }, [text.length, speed, adaptiveSpeed, maxDuration]);
 
   useImperativeHandle(ref, () => ({
     skip: () => {
@@ -43,7 +67,7 @@ const TypewriterText = forwardRef<TypewriterTextHandle, TypewriterTextProps>(({
       if (indexRef.current < text.length) {
         setDisplayed(text.slice(0, indexRef.current + 1));
         indexRef.current++;
-        timerRef.current = setTimeout(type, speed);
+        timerRef.current = setTimeout(type, effectiveSpeed);
       } else if (!doneRef.current) {
         doneRef.current = true;
         onComplete?.();
@@ -54,7 +78,7 @@ const TypewriterText = forwardRef<TypewriterTextHandle, TypewriterTextProps>(({
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [text]);
+  }, [text, effectiveSpeed]);
 
   return (
     <Text style={style}>

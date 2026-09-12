@@ -1,123 +1,108 @@
-import React, { useRef, useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Image } from 'expo-image';
-import TypewriterText from './TypewriterText';
-import type { TypewriterTextHandle } from './TypewriterText';
-import { FontSize, FontWeight, Spacing, Radius } from '../constants/theme';
-
-interface CoachBubbleProps {
-  mascotState?: 'idle' | 'worry' | 'streak' | 'sleep' | 'flex';
-  message: string;
-  typewriter?: boolean;
-  typewriterSpeed?: number;
-  onTypeComplete?: () => void;
-}
+import React, { forwardRef, useImperativeHandle } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import CoachMascot from './CoachMascot';
+import {
+  CoachMood,
+  CoachBehavior,
+  CoachPosition,
+  CoachIntensity,
+  MascotAssetKey,
+} from '../constants/coachAnimation';
+import { FontSize, FontWeight, Spacing } from '../constants/theme';
 
 export interface CoachBubbleHandle {
   skip: () => void;
 }
 
-const mascotImages = {
-  idle: require('../assets/mascot/idle.gif'),
-  worry: require('../assets/mascot/worry.png'),
-  streak: require('../assets/mascot/streak.png'),
-  sleep: require('../assets/mascot/sleeppp.png'),
-  flex: require('../assets/mascot/flex.png'),
-};
-
-const getMascotStyle = (state: string) => {
-  switch (state) {
-    case 'flex':
-      return { width: 300, height: 300, position: 'absolute', left: -50, bottom: -30, zIndex: 2 };
-    case 'streak':
-      return { width: 280, height: 280, position: 'absolute', alignSelf: 'center', bottom: -20, zIndex: 2 };
-    case 'worry':
-      return { width: 280, height: 280, position: 'absolute', left: -40, bottom: -20, zIndex: 2 };
-    case 'sleep':
-      return { width: 260, height: 260, position: 'absolute', alignSelf: 'center', bottom: -20, zIndex: 2 };
-    case 'idle':
-    default:
-      return { width: 250, height: 250, position: 'absolute', alignSelf: 'center', bottom: -10, zIndex: 2 };
-  }
-};
+interface CoachBubbleProps {
+  title?: string;
+  subtitle?: string;
+  message?: string;
+  // Semantic character props
+  assetKey?: MascotAssetKey;
+  mood?: CoachMood;
+  behavior?: CoachBehavior;
+  position?: CoachPosition;
+  intensity?: CoachIntensity;
+  isKeyboardVisible?: boolean;
+  isReducedMotion?: boolean;
+  canTap?: boolean;
+  onMascotTap?: () => void;
+  mascotSize?: number;
+  // Backwards compatibility props
+  typewriter?: boolean;
+  typewriterSpeed?: number;
+  adaptiveSpeed?: boolean;
+  maxDuration?: number;
+  onTypeComplete?: () => void;
+  variant?: 'compact' | 'expanded';
+  mascotState?: 'idle' | 'worry' | 'streak' | 'sleep' | 'flex';
+}
 
 const CoachBubbleRender: React.ForwardRefRenderFunction<CoachBubbleHandle, CoachBubbleProps> = ({
+  title,
+  subtitle,
   message,
-  typewriter = true,
-  typewriterSpeed = 20,
-  mascotState = 'idle',
-  onTypeComplete,
+  assetKey,
+  mood = 'neutral',
+  behavior = 'listen',
+  position = 'topCenter',
+  intensity = 'idle',
+  isKeyboardVisible = false,
+  isReducedMotion = false,
+  canTap = true,
+  onMascotTap,
+  mascotSize,
+  mascotState,
 }, ref) => {
-  const typewriterRef = useRef<TypewriterTextHandle>(null);
-  const [isTyping, setIsTyping] = useState(typewriter);
-
   useImperativeHandle(ref, () => ({
-    skip: () => {
-      if (isTyping) {
-        typewriterRef.current?.skip();
-      }
-    }
+    skip: () => {},
   }));
 
-  useEffect(() => {
-    setIsTyping(typewriter);
-  }, [message, typewriter]);
+  const effectiveAssetKey: MascotAssetKey =
+    assetKey ||
+    (mascotState === 'sleep' ? 'sleep' : (mascotState as MascotAssetKey)) ||
+    'idle';
 
-  const handleComplete = () => {
-    setIsTyping(false);
-    onTypeComplete?.();
-  };
+  const headingText = title || message || '';
 
   return (
-    <Pressable
-      style={styles.container}
-      onPress={() => isTyping && typewriterRef.current?.skip()}
-      accessibilityRole={isTyping ? 'button' : undefined}
-      accessibilityLabel={isTyping ? 'Reveal the full coach message' : undefined}
-      accessibilityHint={isTyping ? 'Skips the typing animation' : undefined}
-      accessible={isTyping}
-    >
+    <View style={styles.container}>
       <View style={styles.mascotStage}>
         <View style={styles.backdropAngle} />
-        <Image
-          source={mascotImages[mascotState]}
-          style={[styles.mascot, getMascotStyle(mascotState) as any]}
-          contentFit="contain"
-          priority="low"
-          cachePolicy="memory-disk"
+        <CoachMascot
+          assetKey={effectiveAssetKey}
+          mood={mood}
+          behavior={behavior}
+          position={position}
+          intensity={intensity}
+          isKeyboardVisible={isKeyboardVisible}
+          isReducedMotion={isReducedMotion}
+          canTap={canTap}
+          onTap={onMascotTap}
+          size={mascotSize}
         />
       </View>
       <View style={styles.textWrap}>
-        {typewriter ? (
-          <TypewriterText
-            ref={typewriterRef}
-            text={message}
-            speed={typewriterSpeed}
-            style={styles.questionText}
-            onComplete={handleComplete}
-          />
-        ) : (
-          <Text style={styles.questionText}>{message}</Text>
-        )}
-        {isTyping && (
-          <Text style={styles.tapToSkipText}>Tap anywhere to skip</Text>
-        )}
+        <Text style={styles.titleText}>{headingText}</Text>
+        {subtitle ? <Text style={styles.subtitleText}>{subtitle}</Text> : null}
       </View>
-    </Pressable>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'stretch',
+    alignItems: 'center',
     marginBottom: Spacing.md,
   },
   mascotStage: {
-    height: 240,
+    height: 220,
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.md,
     position: 'relative',
+    marginBottom: Spacing.xs,
   },
   backdropAngle: {
     position: 'absolute',
@@ -129,31 +114,25 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 40,
     transform: [{ rotate: '-3deg' }],
   },
-  mascot: {
-    width: 125,
-    height: 125,
-    zIndex: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 15,
-  },
   textWrap: {
-    minHeight: 126,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: Spacing.xs,
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    marginTop: Spacing.xs,
   },
-  questionText: {
-    fontSize: 22,
+  titleText: {
+    fontSize: 24,
     fontWeight: FontWeight.bold,
     color: '#111827',
-    lineHeight: 30,
+    textAlign: 'center',
     letterSpacing: -0.4,
+    lineHeight: 32,
   },
-  tapToSkipText: {
-    fontSize: FontSize.sm,
-    color: '#9CA3AF',
-    marginTop: Spacing.sm,
+  subtitleText: {
+    fontSize: FontSize.md,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 22,
     fontWeight: FontWeight.medium,
   },
 });
