@@ -1,6 +1,15 @@
 import React, { useRef } from 'react';
-import { Animated, Pressable, PressableProps, StyleProp, ViewStyle, Platform } from 'react-native';
+import {
+  Animated,
+  Pressable,
+  PressableProps,
+  StyleProp,
+  ViewStyle,
+  Platform,
+} from 'react-native';
 import * as Haptics from 'expo-haptics';
+
+const AnimatedPressableBase = Animated.createAnimatedComponent(Pressable);
 
 interface AnimatedPressableProps extends PressableProps {
   children: React.ReactNode;
@@ -57,16 +66,18 @@ export default function AnimatedPressable({
   };
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={onPress}
-        style={style}
-        {...props}
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
+    <AnimatedPressableBase
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={onPress}
+      style={
+        typeof style === 'function'
+          ? (state: any) => [style(state), { transform: [{ scale }] }]
+          : [style as any, { transform: [{ scale }] }]
+      }
+      {...props}
+    >
+      {children}
+    </AnimatedPressableBase>
   );
 }

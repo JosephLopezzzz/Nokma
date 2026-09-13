@@ -1687,10 +1687,11 @@ const styles = StyleSheet.create({
 
   // ── 2x2 Bento Goal Grid ──
   goalGrid: {
+    width: '100%',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    rowGap: 10,
+    rowGap: 12,
     marginVertical: Spacing.xs,
   },
   goalCard: {
@@ -1699,11 +1700,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#EEDECB',
     borderRadius: 18,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     position: 'relative',
     shadowColor: '#3A2010',
     shadowOpacity: 0.04,
@@ -1735,8 +1737,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   goalIconBox: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     borderRadius: 10,
     backgroundColor: '#F5EBE0',
     alignItems: 'center',
@@ -1758,13 +1760,15 @@ const styles = StyleSheet.create({
 
   // ── 5-Pill Activity Stepper ──
   activityWrap: {
+    width: '100%',
     gap: 12,
     marginVertical: Spacing.xs,
   },
   stepperRow: {
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 6,
+    gap: 8,
   },
   stepperPill: {
     flex: 1,
@@ -1772,7 +1776,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#EEDECB',
     borderRadius: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
+    minHeight: 64,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#3A2010',
