@@ -84,7 +84,6 @@ const CoachBubbleRender: React.ForwardRefRenderFunction<CoachBubbleHandle, Coach
   return (
     <View style={styles.container}>
       <View style={styles.mascotStage}>
-        <View style={styles.backdropHalo} />
         <CoachMascot
           assetKey={effectiveAssetKey}
           mood={mood}
@@ -118,15 +117,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
     marginBottom: Spacing.xs,
-  },
-  backdropHalo: {
-    position: 'absolute',
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    backgroundColor: '#F5E8DC',
-    opacity: 0.65,
-    transform: [{ scaleX: 1.15 }],
   },
   textWrap: {
     alignItems: 'center',

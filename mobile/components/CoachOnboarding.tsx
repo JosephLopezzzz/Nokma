@@ -680,20 +680,6 @@ export default function CoachOnboarding() {
           {/* ── Step 0: Language selection ── */}
           {currentStep === 'language' && (
             <View style={styles.langScreen}>
-              <View style={styles.brandHeroCard}>
-                <ExpoImage
-                  source={require('../assets/mascot/nokma_logo_badge.png')}
-                  style={styles.brandHeroLogo}
-                  contentFit="contain"
-                />
-                <View style={styles.brandHeroTextWrap}>
-                  <Text style={styles.brandHeroName}>NOKMA</Text>
-                  <Text style={styles.brandHeroTagline}>
-                    {lang === 'filipino' ? 'Personal Nutrition & Macro Coach' : 'Personal Nutrition & Macro Coach'}
-                  </Text>
-                </View>
-              </View>
-
               <View style={styles.optionsStack}>
                 <AnimatedPressable
                   style={[styles.optionCard, lang === 'english' && styles.optionCardActive]}
@@ -1484,45 +1470,6 @@ const styles = StyleSheet.create({
   inputAreaCentered: {
     gap: Spacing.md,
     marginTop: Spacing.xs,
-  },
-
-  // Brand Hero Card (Step 0)
-  brandHeroCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#EEDECB',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: Spacing.sm,
-    shadowColor: '#3A2010',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  brandHeroLogo: {
-    width: 46,
-    height: 46,
-    borderRadius: 12,
-  },
-  brandHeroTextWrap: {
-    flex: 1,
-  },
-  brandHeroName: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.extrabold,
-    color: Colors.primary,
-    letterSpacing: 0.8,
-  },
-  brandHeroTagline: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    fontWeight: FontWeight.medium,
-    marginTop: 1,
   },
 
   inputCard: {
