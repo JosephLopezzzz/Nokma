@@ -1,0 +1,457 @@
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Animated,
+  Platform,
+  Keyboard,
+} from 'react-native';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
+import { FontSize } from '../constants/theme';
+import type { StringKey } from '../constants/strings';
+
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+interface TabConfig {
+  name: string;
+  iconFocused: IoniconsName;
+  iconUnfocused: IoniconsName;
+  labelKey?: StringKey;
+  fallbackLabel: string;
+}
+
+const TAB_CONFIG: Record<string, TabConfig> = {
+  index: {
+    name: 'index',
+    iconFocused: 'home',
+    iconUnfocused: 'home-outline',
+    labelKey: 'tab.dashboard',
+    fallbackLabel: 'Home',
+  },
+  search: {
+    name: 'search',
+    iconFocused: 'search',
+    iconUnfocused: 'search-outline',
+    labelKey: 'tab.search',
+    fallbackLabel: 'Search',
+  },
+  log: {
+    name: 'log',
+    iconFocused: 'scan',
+    iconUnfocused: 'scan',
+    labelKey: 'tab.log',
+    fallbackLabel: 'Scan',
+  },
+  progress: {
+    name: 'progress',
+    iconFocused: 'bar-chart',
+    iconUnfocused: 'bar-chart-outline',
+    fallbackLabel: 'Progress',
+  },
+  profile: {
+    name: 'profile',
+    iconFocused: 'person',
+    iconUnfocused: 'person-outline',
+    labelKey: 'tab.profile',
+    fallbackLabel: 'Profile',
+  },
+};
+
+function TabItem({
+  route,
+  isFocused,
+  onPress,
+  onLongPress,
+  config,
+  label,
+}: {
+  route: any;
+  isFocused: boolean;
+  onPress: () => void;
+  onLongPress: () => void;
+  config: TabConfig;
+  label: string;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 8,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 8,
+    }).start();
+  };
+
+  const activeColor = '#FFFFFF';
+  const inactiveColor = '#8E95A0';
+
+  return (
+    <Pressable
+      onPress={() => {
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        }
+        onPress();
+      }}
+      onLongPress={onLongPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={styles.tabButton}
+      accessibilityRole="button"
+      accessibilityState={isFocused ? { selected: true } : {}}
+      accessibilityLabel={label}
+    >
+      <Animated.View style={[styles.tabContent, { transform: [{ scale: scaleAnim }] }]}>
+        <Ionicons
+          name={isFocused ? config.iconFocused : config.iconUnfocused}
+          size={22}
+          color={isFocused ? activeColor : inactiveColor}
+        />
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.tabLabel,
+            { color: isFocused ? activeColor : inactiveColor, fontWeight: isFocused ? '700' : '500' },
+          ]}
+        >
+          {label}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function CenterActionButton({
+  onPress,
+  primaryColor,
+}: {
+  onPress: () => void;
+  primaryColor: string;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.92,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 10,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 10,
+    }).start();
+  };
+
+  return (
+    <View style={styles.centerButtonWrapper} pointerEvents="box-none">
+      {/* Curved notch backdrop cradle */}
+      <View style={styles.notchCradle} />
+
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <Pressable
+          onPress={() => {
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            }
+            onPress();
+          }}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={[styles.centerFab, { backgroundColor: primaryColor, shadowColor: primaryColor }]}
+          accessibilityRole="button"
+          accessibilityLabel="Scan and log meal"
+        >
+          <Ionicons name="scan" size={26} color="#FFFFFF" />
+        </Pressable>
+      </Animated.View>
+    </View>
+  );
+}
+
+export default function FloatingTabBar({
+  state,
+  descriptors,
+  navigation,
+}: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const { t } = useLanguage();
+
+  // Keyboard avoidance animation
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const translateYAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+        Animated.timing(translateYAnim, {
+          toValue: 120,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+        Animated.spring(translateYAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 70,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [translateYAnim]);
+
+  // Separate left tabs, center action, and right tabs
+  const leftRoutes = state.routes.filter((r) => r.name === 'index' || r.name === 'search');
+  const centerRoute = state.routes.find((r) => r.name === 'log');
+  const rightRoutes = state.routes.filter((r) => r.name === 'progress' || r.name === 'profile');
+
+  const bottomInset = Math.max(insets.bottom, 16);
+
+  return (
+    <Animated.View
+      style={[
+        styles.floatingContainer,
+        {
+          bottom: bottomInset,
+          transform: [{ translateY: translateYAnim }],
+        },
+      ]}
+      pointerEvents={isKeyboardVisible ? 'none' : 'box-none'}
+    >
+      <View style={styles.pillBar}>
+        {/* Left tabs (Home, Search) */}
+        <View style={styles.tabGroup}>
+          {leftRoutes.map((route) => {
+            const index = state.routes.findIndex((r) => r.key === route.key);
+            const isFocused = state.index === index;
+            const config = TAB_CONFIG[route.name] || {
+              name: route.name,
+              iconFocused: 'ellipse',
+              iconUnfocused: 'ellipse-outline',
+              fallbackLabel: route.name,
+            };
+
+            const label = config.labelKey ? t(config.labelKey) : config.fallbackLabel;
+
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name, route.params);
+              }
+            };
+
+            const onLongPress = () => {
+              navigation.emit({
+                type: 'tabLongPress',
+                target: route.key,
+              });
+            };
+
+            return (
+              <TabItem
+                key={route.key}
+                route={route}
+                isFocused={isFocused}
+                onPress={onPress}
+                onLongPress={onLongPress}
+                config={config}
+                label={label}
+              />
+            );
+          })}
+        </View>
+
+        {/* Center spacing spacer for FAB */}
+        <View style={styles.centerPlaceholder} />
+
+        {/* Right tabs (Progress, Profile) */}
+        <View style={styles.tabGroup}>
+          {rightRoutes.map((route) => {
+            const index = state.routes.findIndex((r) => r.key === route.key);
+            const isFocused = state.index === index;
+            const config = TAB_CONFIG[route.name] || {
+              name: route.name,
+              iconFocused: 'ellipse',
+              iconUnfocused: 'ellipse-outline',
+              fallbackLabel: route.name,
+            };
+
+            const label = config.labelKey ? t(config.labelKey) : config.fallbackLabel;
+
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name, route.params);
+              }
+            };
+
+            const onLongPress = () => {
+              navigation.emit({
+                type: 'tabLongPress',
+                target: route.key,
+              });
+            };
+
+            return (
+              <TabItem
+                key={route.key}
+                route={route}
+                isFocused={isFocused}
+                onPress={onPress}
+                onLongPress={onLongPress}
+                config={config}
+                label={label}
+              />
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Elevated center action button */}
+      {centerRoute && (
+        <CenterActionButton
+          primaryColor={colors.primary}
+          onPress={() => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: centerRoute.key,
+              canPreventDefault: true,
+            });
+
+            if (!event.defaultPrevented) {
+              navigation.navigate(centerRoute.name, centerRoute.params);
+            }
+          }}
+        />
+      )}
+    </Animated.View>
+  );
+}
+
+const styles = StyleSheet.create({
+  floatingContainer: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    zIndex: 99,
+    alignItems: 'center',
+  },
+  pillBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    height: 66,
+    backgroundColor: '#16191D',
+    borderRadius: 33,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Deep ambient floating shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 12,
+  },
+  tabGroup: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  centerPlaceholder: {
+    width: 62,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  tabContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  tabLabel: {
+    fontSize: FontSize.xs || 11,
+    letterSpacing: 0.1,
+  },
+  centerButtonWrapper: {
+    position: 'absolute',
+    top: -18,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 101,
+  },
+  notchCradle: {
+    position: 'absolute',
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: '#16191D',
+    top: -3,
+    // Matching pill border
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  centerFab: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+});

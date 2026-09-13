@@ -334,7 +334,7 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   bodyContent: {
     padding: Spacing.lg,
     gap: Spacing.md,
-    paddingBottom: 40,
+    paddingBottom: 110,
   },
   card: {
     backgroundColor: colors.bgCard,

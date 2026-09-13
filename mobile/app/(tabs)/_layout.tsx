@@ -1,23 +1,10 @@
+import React, { useRef } from 'react';
 import { Tabs, router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { View, Pressable, Image, StyleSheet, Animated, PanResponder, Dimensions } from 'react-native';
-import { useRef } from 'react';
+import { View, Image, StyleSheet, Animated, PanResponder, Dimensions } from 'react-native';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
-import { FontSize } from '../../constants/theme';
 import AnimatedPressable from '../../components/AnimatedPressable';
-
-type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
-
-function TabIcon({ name, focused, activeColor, inactiveColor }: { name: IoniconsName; focused: boolean; activeColor: string; inactiveColor: string }) {
-  return (
-    <Ionicons
-      name={focused ? name : (`${name}-outline` as IoniconsName)}
-      size={24}
-      color={focused ? activeColor : inactiveColor}
-    />
-  );
-}
+import FloatingTabBar from '../../components/FloatingTabBar';
 
 export default function TabLayout() {
   const { t } = useLanguage();
@@ -28,7 +15,7 @@ export default function TabLayout() {
   const screenHeight = Dimensions.get('window').height;
   const BUTTON_SIZE = 60;
   const MARGIN = 16;
-  const MAX_Y = screenHeight - 150; // approximate boundary above tabs
+  const MAX_Y = screenHeight - 160; // approximate boundary above floating tabs
   const MIN_Y = 50; // approximate boundary below header
 
   const panResponder = useRef(
@@ -55,13 +42,10 @@ export default function TabLayout() {
         const currentY = (pan.y as any)._value;
         
         // Snap to nearest side (left or right)
-        // Original position is right: 16 (which is screenWidth - BUTTON_SIZE - MARGIN)
-        // If currentX is negative, it's moving left.
         const absoluteX = screenWidth - BUTTON_SIZE - MARGIN + currentX;
         
         let targetX = 0; // default back to original (right side)
         if (absoluteX < screenWidth / 2) {
-          // Snap to left side: currentX needs to be -(screenWidth - BUTTON_SIZE - MARGIN * 2)
           targetX = -(screenWidth - BUTTON_SIZE - MARGIN * 2);
         }
         
@@ -82,52 +66,23 @@ export default function TabLayout() {
   return (
     <View style={{ flex: 1 }}>
       <Tabs
+        tabBar={(props) => <FloatingTabBar {...props} />}
         screenOptions={{
           headerShown: false,
-          tabBarStyle: {
-            backgroundColor: colors.bgCard,
-            borderTopColor: colors.border,
-            borderTopWidth: 1,
-            height: 68,
-            paddingTop: 6,
-            paddingBottom: 10,
-          },
-          tabBarActiveTintColor:   colors.primary,
-          tabBarInactiveTintColor: colors.textMuted,
-          tabBarLabelStyle: { fontSize: FontSize.xs, fontWeight: '600' },
         }}
       >
         <Tabs.Screen
           name="index"
-          options={{ title: t('tab.dashboard'), tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} activeColor={colors.primary} inactiveColor={colors.textMuted} /> }}
+          options={{ title: t('tab.dashboard') }}
         />
         <Tabs.Screen
           name="search"
-          options={{ title: t('tab.search'), tabBarIcon: ({ focused }) => <TabIcon name="search" focused={focused} activeColor={colors.primary} inactiveColor={colors.textMuted} /> }}
+          options={{ title: t('tab.search') }}
         />
         <Tabs.Screen
           name="log"
           options={{
             title: t('tab.log'),
-            tabBarIcon: () => (
-              <View style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                backgroundColor: colors.primary,
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: 20,
-                shadowColor: colors.primary,
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 6,
-                elevation: 5,
-              }}>
-                <Ionicons name="scan" size={28} color="#fff" />
-              </View>
-            ),
-            tabBarLabel: () => null,
           }}
           listeners={{
             tabPress: (e) => {
@@ -138,11 +93,11 @@ export default function TabLayout() {
         />
         <Tabs.Screen
           name="progress"
-          options={{ title: 'Progress', tabBarIcon: ({ focused }) => <TabIcon name="bar-chart" focused={focused} activeColor={colors.primary} inactiveColor={colors.textMuted} /> }}
+          options={{ title: 'Progress' }}
         />
         <Tabs.Screen
           name="profile"
-          options={{ title: t('tab.profile'), tabBarIcon: ({ focused }) => <TabIcon name="person" focused={focused} activeColor={colors.primary} inactiveColor={colors.textMuted} /> }}
+          options={{ title: t('tab.profile') }}
         />
       </Tabs>
       

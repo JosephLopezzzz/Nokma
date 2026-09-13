@@ -512,7 +512,7 @@ export default function ProfileScreen() {
 
 const getStyles = (colors: ThemeColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: 40 },
+  content: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: 110 },
   avatarSection: { alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.lg },
   avatarWrapper: {
     width: 140, height: 140,

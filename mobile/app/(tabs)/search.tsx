@@ -861,7 +861,7 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   
   fabContainer: {
     position: 'absolute',
-    bottom: Spacing.xl,
+    bottom: 96,
     right: Spacing.xl,
     gap: Spacing.md,
     alignItems: 'center',
@@ -897,7 +897,7 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   loader: { marginTop: Spacing.xxl },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md, padding: Spacing.xl },
   emptyText: { fontSize: FontSize.md, color: colors.textSecondary },
-  list: { padding: Spacing.lg },
+  list: { padding: Spacing.lg, paddingBottom: 110 },
 
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
