@@ -1,5 +1,5 @@
-import React, { forwardRef, useImperativeHandle } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import CoachMascot from './CoachMascot';
 import {
   CoachMood,
@@ -66,10 +66,25 @@ const CoachBubbleRender: React.ForwardRefRenderFunction<CoachBubbleHandle, Coach
 
   const headingText = title || message || '';
 
+  const textFade = useRef(new Animated.Value(1)).current;
+  const prevHeadingRef = useRef(headingText);
+
+  useEffect(() => {
+    if (prevHeadingRef.current !== headingText) {
+      prevHeadingRef.current = headingText;
+      textFade.setValue(0.2);
+      Animated.timing(textFade, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [headingText, textFade]);
+
   return (
     <View style={styles.container}>
       <View style={styles.mascotStage}>
-        <View style={styles.backdropAngle} />
+        <View style={styles.backdropHalo} />
         <CoachMascot
           assetKey={effectiveAssetKey}
           mood={mood}
@@ -83,10 +98,10 @@ const CoachBubbleRender: React.ForwardRefRenderFunction<CoachBubbleHandle, Coach
           size={mascotSize}
         />
       </View>
-      <View style={styles.textWrap}>
+      <Animated.View style={[styles.textWrap, { opacity: textFade }]}>
         <Text style={styles.titleText}>{headingText}</Text>
         {subtitle ? <Text style={styles.subtitleText}>{subtitle}</Text> : null}
-      </View>
+      </Animated.View>
     </View>
   );
 };
@@ -97,22 +112,21 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   mascotStage: {
-    height: 220,
+    height: 200,
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
     marginBottom: Spacing.xs,
   },
-  backdropAngle: {
+  backdropHalo: {
     position: 'absolute',
-    top: 0,
-    left: -20,
-    right: -20,
-    bottom: 20,
-    backgroundColor: '#F3F4F6',
-    borderBottomRightRadius: 40,
-    transform: [{ rotate: '-3deg' }],
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    backgroundColor: '#F5E8DC',
+    opacity: 0.65,
+    transform: [{ scaleX: 1.15 }],
   },
   textWrap: {
     alignItems: 'center',
@@ -122,9 +136,9 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 24,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: '#1F2937',
     textAlign: 'center',
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
     lineHeight: 32,
   },
   subtitleText: {

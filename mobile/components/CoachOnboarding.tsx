@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  Pressable,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -14,7 +13,9 @@ import {
   ActivityIndicator,
   Modal,
   SafeAreaView,
+  Easing,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,6 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import CoachBubble from './CoachBubble';
 import Confetti from './Confetti';
+import AnimatedPressable from './AnimatedPressable';
 import { useCoachHoo, CoachStepConfig } from '../hooks/useCoachHoo';
 import SearchableSelectList from './SearchableSelectList';
 import {
@@ -221,8 +223,17 @@ export default function CoachOnboarding() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [healthModalOpen, setHealthModalOpen] = useState(false);
   const [allergiesModalOpen, setAllergiesModalOpen] = useState(false);
+
+  // Smooth Form Transition values
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Smooth Spring Progress Bar value
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  // Step 5 baseline calculation entrance
+  const baselineAnim = useRef(new Animated.Value(1)).current;
 
   // Persistent Coach Hoo character state machine
   const coach = useCoachHoo(STEP_COACH_CONFIG.language);
@@ -274,6 +285,7 @@ export default function CoachOnboarding() {
     [step, saveProgress],
   );
 
+  // Fluid, spring-assisted step navigation
   const goToStep = useCallback(
     (next: number) => {
       setValidationError(null);
@@ -282,20 +294,56 @@ export default function CoachOnboarding() {
       const nextConfig = STEP_COACH_CONFIG[nextStepKey] || STEP_COACH_CONFIG.welcome;
       coach.trigger('screen-enter', nextConfig);
 
+      // Phase 1: Fluid exit of the question card
       Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: isForward ? -40 : 40, duration: 150, useNativeDriver: true })
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 120,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: isForward ? -20 : 20,
+          duration: 120,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.98,
+          duration: 120,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
       ]).start(() => {
         setStep(next);
         saveProgress(next, form);
-        slideAnim.setValue(isForward ? 40 : -40);
+        slideAnim.setValue(isForward ? 20 : -20);
+        scaleAnim.setValue(0.98);
+
+        // Phase 2: Fluid entrance of the new question card
         Animated.parallel([
-          Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-          Animated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true })
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
         ]).start();
       });
     },
-    [form, saveProgress, step, coach, fadeAnim, slideAnim],
+    [form, saveProgress, step, coach, fadeAnim, slideAnim, scaleAnim],
   );
 
   const validateCurrent = (): boolean => {
@@ -423,6 +471,19 @@ export default function CoachOnboarding() {
 
   const goalKeys = ['lose', 'maintain', 'gain', 'build_habits'] as const;
 
+  // Step 5 reveal animation
+  useEffect(() => {
+    if (currentStep === 'feedback') {
+      baselineAnim.setValue(0.9);
+      Animated.spring(baselineAnim, {
+        toValue: 1,
+        damping: 15,
+        stiffness: 140,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [currentStep, baselineAnim]);
+
   const handleExitSetup = () => {
     Alert.alert(
       t('onboarding.exitTitle'),
@@ -439,30 +500,147 @@ export default function CoachOnboarding() {
   const showBack = step > 0 && currentStep !== 'feedback';
   const isFirstStep = currentStep === 'language';
 
+  // Smooth animated progress bar fill
+  useEffect(() => {
+    if (currentStep === 'language') {
+      progressAnim.setValue(0);
+    } else {
+      const target = Math.max(0, Math.min(1, (dotIndex + 1) / visibleSteps.length));
+      Animated.spring(progressAnim, {
+        toValue: target,
+        damping: 20,
+        stiffness: 150,
+        mass: 0.8,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [dotIndex, visibleSteps.length, currentStep, progressAnim]);
+
+  // Derived step title and subtitle for anchored CoachBubble
+  const stepMeta = useMemo(() => {
+    switch (currentStep) {
+      case 'language':
+        return {
+          title: lang === 'filipino' ? 'Piliin ang iyong wika' : 'Select your language',
+          subtitle: lang === 'filipino' ? 'Maligayang pagdating sa Nokma!' : 'Welcome to Nokma nutrition!',
+        };
+      case 'welcome':
+        return {
+          title: lang === 'filipino' ? 'Ano ang iyong pangalan?' : "What's your name?",
+          subtitle: lang === 'filipino' ? 'I-personalize natin ang iyong plano' : "Let's personalize your coaching",
+        };
+      case 'age':
+        return {
+          title: lang === 'filipino' ? 'Ilang taon ka na?' : 'How old are you?',
+          subtitle: lang === 'filipino' ? 'Para sa tamang kalkulasyon ng calories' : 'Used to calculate your daily metabolism',
+        };
+      case 'sex':
+        return {
+          title: lang === 'filipino' ? 'Ano ang iyong kasarian?' : "What's your biological sex?",
+          subtitle: lang === 'filipino' ? 'Para sa tamang target ng nutrisyon' : 'Helps tailor calorie and macro targets',
+        };
+      case 'height_weight':
+        return {
+          title: lang === 'filipino' ? 'Iyong taas at timbang' : 'Height and weight',
+          subtitle: lang === 'filipino' ? 'Panimulang sukat ng iyong katawan' : "Let's establish your baseline metrics",
+        };
+      case 'feedback':
+        return {
+          title: lang === 'filipino' ? 'Handa na ang iyong baseline!' : 'Your baseline is ready!',
+          subtitle:
+            lang === 'filipino'
+              ? 'Kinalkula mula sa iyong sukat, edad, at kasarian'
+              : 'Calculated from your body metrics & metabolism',
+        };
+      case 'goal':
+        return {
+          title: lang === 'filipino' ? 'Ano ang iyong layunin?' : 'What is your main goal?',
+          subtitle:
+            lang === 'filipino'
+              ? `Iminumungkahi namin ang ${getGoalLabel(lang, suggestedGoal)} batay sa iyong BMI`
+              : `We recommend ${getGoalLabel(lang, suggestedGoal)} based on your BMI`,
+        };
+      case 'activity':
+        return {
+          title: lang === 'filipino' ? 'Gaano ka ka-aktibo?' : 'How active are you?',
+          subtitle: lang === 'filipino' ? 'Araw-araw na galaw at ehersisyo' : 'Include work and daily movement',
+        };
+      case 'health':
+        return {
+          title: lang === 'filipino' ? 'May kondisyon sa kalusugan?' : 'Any health conditions?',
+          subtitle: lang === 'filipino' ? 'Aayusin namin ang mga payo nang ligtas' : "We'll tailor nutrition advice safely",
+        };
+      case 'allergies':
+        return {
+          title: lang === 'filipino' ? 'May mga allergy sa pagkain?' : 'Any food allergies?',
+          subtitle: lang === 'filipino' ? 'Ihihiwalay namin ito sa iyong pagkain' : "We'll filter these out of your meals",
+        };
+      case 'finish':
+        return {
+          title: lang === 'filipino' ? 'Handa ka na!' : "You're all set!",
+          subtitle: lang === 'filipino' ? 'Suriin ang iyong profile sa ibaba' : 'Review your customized profile below',
+        };
+      default:
+        return { title: '', subtitle: '' };
+    }
+  }, [currentStep, lang, suggestedGoal]);
+
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {/* Top Header Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm }]}>
         {isFirstStep ? (
-          <Pressable onPress={handleExitSetup} style={styles.backBtn} accessibilityLabel={t('onboarding.exitSetup')}>
+          <AnimatedPressable
+            onPress={handleExitSetup}
+            style={styles.backBtn}
+            accessibilityLabel={t('onboarding.exitSetup')}
+            scaleTo={0.94}
+            hapticStyle="Light"
+          >
             <Text style={styles.backText}>{t('common.exit')}</Text>
-          </Pressable>
+          </AnimatedPressable>
         ) : showBack ? (
-          <Pressable onPress={() => goToStep(step - 1)} style={styles.backBtn} accessibilityLabel={t('common.back')}>
+          <AnimatedPressable
+            onPress={() => goToStep(step - 1)}
+            style={styles.backBtn}
+            accessibilityLabel={t('common.back')}
+            scaleTo={0.94}
+            hapticStyle="Light"
+          >
             <Ionicons name="chevron-back" size={20} color={Colors.textSecondary} />
             <Text style={styles.backText}>{t('common.back')}</Text>
-          </Pressable>
+          </AnimatedPressable>
         ) : (
           <View style={styles.backBtn} />
         )}
-        {currentStep !== 'language' && currentStep !== 'feedback' && (
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBarFill, { width: `${((dotIndex + 1) / visibleSteps.length) * 100}%` }]} />
+
+        {currentStep !== 'language' && currentStep !== 'feedback' ? (
+          <View style={styles.progressRow}>
+            <View style={styles.progressBarContainer}>
+              <Animated.View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: progressAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0%', '100%'],
+                    }),
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.stepIndicatorText}>
+              {dotIndex + 1}/{visibleSteps.length}
+            </Text>
           </View>
+        ) : (
+          <View style={{ flex: 1 }} />
         )}
-        <View style={styles.backBtn} />
+
+        <View style={styles.backBtnPlaceholder} />
       </View>
 
       <ScrollView
@@ -471,34 +649,63 @@ export default function CoachOnboarding() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View style={[styles.stepAnimatedWrap, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
+        {/* Anchored Mascot Companion Header */}
+        <CoachBubble
+          title={validationError || stepMeta.title}
+          subtitle={validationError ? undefined : stepMeta.subtitle}
+          assetKey={coach.assetKey}
+          mood={coach.mood}
+          behavior={coach.behavior}
+          position="topCenter"
+          intensity={coach.intensity}
+          isKeyboardVisible={coach.isKeyboardVisible}
+          isReducedMotion={coach.isReducedMotion}
+          canTap={coach.canTap}
+          onMascotTap={() => coach.trigger('tap-mascot')}
+        />
+
+        {/* Fluid Animated Form Area */}
+        <Animated.View
+          style={[
+            styles.stepAnimatedWrap,
+            {
+              opacity: fadeAnim,
+              transform: [
+                { translateX: slideAnim },
+                { scale: scaleAnim },
+              ],
+            },
+          ]}
+        >
           {/* ── Step 0: Language selection ── */}
           {currentStep === 'language' && (
             <View style={styles.langScreen}>
-              <CoachBubble
-                title={lang === 'filipino' ? 'Piliin ang iyong wika' : 'Select your language'}
-                subtitle={lang === 'filipino' ? 'Piliin ang nais mong wika' : 'Choose your preferred language'}
-                assetKey={coach.assetKey}
-                mood={coach.mood}
-                behavior={coach.behavior}
-                position="topCenter"
-                intensity={coach.intensity}
-                isKeyboardVisible={false}
-                isReducedMotion={coach.isReducedMotion}
-                canTap={true}
-                onMascotTap={() => coach.trigger('tap-mascot')}
-              />
+              <View style={styles.brandHeroCard}>
+                <ExpoImage
+                  source={require('../assets/mascot/nokma_logo_badge.png')}
+                  style={styles.brandHeroLogo}
+                  contentFit="contain"
+                />
+                <View style={styles.brandHeroTextWrap}>
+                  <Text style={styles.brandHeroName}>NOKMA</Text>
+                  <Text style={styles.brandHeroTagline}>
+                    {lang === 'filipino' ? 'Personal Nutrition & Macro Coach' : 'Personal Nutrition & Macro Coach'}
+                  </Text>
+                </View>
+              </View>
 
               <View style={styles.optionsStack}>
-                <Pressable
+                <AnimatedPressable
                   style={[styles.optionCard, lang === 'english' && styles.optionCardActive]}
                   onPress={async () => {
                     await setLang('english');
                     coach.trigger('answer-success', { mood: 'happy', asset: 'streak' });
                     setTimeout(() => {
                       goToStep(step + 1);
-                    }, 200);
+                    }, 220);
                   }}
+                  scaleTo={0.97}
+                  hapticStyle="selection"
                 >
                   <Text style={[styles.optionCardText, lang === 'english' && styles.optionCardTextActive]}>
                     English
@@ -506,16 +713,19 @@ export default function CoachOnboarding() {
                   {lang === 'english' && (
                     <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
                   )}
-                </Pressable>
-                <Pressable
+                </AnimatedPressable>
+
+                <AnimatedPressable
                   style={[styles.optionCard, lang === 'filipino' && styles.optionCardActive]}
                   onPress={async () => {
                     await setLang('filipino');
                     coach.trigger('answer-success', { mood: 'happy', asset: 'streak' });
                     setTimeout(() => {
                       goToStep(step + 1);
-                    }, 200);
+                    }, 220);
                   }}
+                  scaleTo={0.97}
+                  hapticStyle="selection"
                 >
                   <Text style={[styles.optionCardText, lang === 'filipino' && styles.optionCardTextActive]}>
                     Filipino
@@ -523,20 +733,14 @@ export default function CoachOnboarding() {
                   {lang === 'filipino' && (
                     <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
                   )}
-                </Pressable>
+                </AnimatedPressable>
               </View>
             </View>
           )}
 
           {/* ── Step 1: Welcome (Name) ── */}
           {currentStep === 'welcome' && (
-            <StepContent
-              title={lang === 'filipino' ? 'Ano ang iyong pangalan?' : "What's your name?"}
-              subtitle={lang === 'filipino' ? 'I-personalize natin ang iyong plano' : "Let's personalize your coaching"}
-              stepKey="welcome"
-              validationError={validationError}
-              coach={coach}
-            >
+            <StepContent>
               <View style={styles.inputAreaCentered}>
                 <TextInput
                   style={styles.inputCard}
@@ -553,13 +757,7 @@ export default function CoachOnboarding() {
 
           {/* ── Step 2: Age ── */}
           {currentStep === 'age' && (
-            <StepContent
-              title={lang === 'filipino' ? 'Ilang taon ka na?' : 'How old are you?'}
-              subtitle={lang === 'filipino' ? 'Para sa tamang kalkulasyon ng calories' : 'Used to calculate your daily metabolism'}
-              stepKey="age"
-              validationError={validationError}
-              coach={coach}
-            >
+            <StepContent>
               <View style={styles.inputAreaCentered}>
                 <TextInput
                   style={styles.inputCardCentered}
@@ -578,22 +776,18 @@ export default function CoachOnboarding() {
 
           {/* ── Step 3: Sex ── */}
           {currentStep === 'sex' && (
-            <StepContent
-              title={lang === 'filipino' ? 'Ano ang iyong kasarian?' : "What's your biological sex?"}
-              subtitle={lang === 'filipino' ? 'Para sa tamang target ng nutrisyon' : 'Helps tailor calorie and macro targets'}
-              stepKey="sex"
-              validationError={validationError}
-              coach={coach}
-            >
+            <StepContent>
               <View style={styles.optionsRow}>
                 {['male', 'female'].map((s) => (
-                  <Pressable
+                  <AnimatedPressable
                     key={s}
                     style={[styles.sexCard, form.sex === s && styles.optionCardActive]}
                     onPress={() => {
                       updateForm({ sex: s as any });
                       coach.trigger('answer-success', { mood: 'happy', asset: 'idle' });
                     }}
+                    scaleTo={0.96}
+                    hapticStyle="selection"
                   >
                     <Ionicons
                       name={s === 'male' ? 'man-outline' : 'woman-outline'}
@@ -606,7 +800,7 @@ export default function CoachOnboarding() {
                     {form.sex === s && (
                       <Ionicons name="checkmark-circle" size={18} color={Colors.primary} />
                     )}
-                  </Pressable>
+                  </AnimatedPressable>
                 ))}
               </View>
               {form.sex ? (
@@ -617,20 +811,14 @@ export default function CoachOnboarding() {
 
           {/* ── Step 4: Height & Weight ── */}
           {currentStep === 'height_weight' && (
-            <StepContent
-              title={lang === 'filipino' ? 'Iyong taas at timbang' : 'Height and weight'}
-              subtitle={lang === 'filipino' ? 'Panimulang sukat ng iyong katawan' : "Let's establish your baseline metrics"}
-              stepKey="height_weight"
-              validationError={validationError}
-              coach={coach}
-            >
+            <StepContent>
               <View style={styles.dualRow}>
                 <View style={styles.dualField}>
                   <Text style={styles.fieldLabel}>{t('onboarding.height')}</Text>
                   <View style={styles.inputWithUnit}>
                     <TextInput
                       style={[styles.inputCardCentered, styles.inputFlex]}
-                      placeholder={`e.g. ${form.heightUnit === 'cm' ? '175' : "5.9"}`}
+                      placeholder={`e.g. ${form.heightUnit === 'cm' ? '175' : '5.9'}`}
                       placeholderTextColor="#9CA3AF"
                       value={form.heightValue}
                       onChangeText={(v) => updateForm({ heightValue: v.replace(/[^0-9.]/g, '') })}
@@ -668,18 +856,8 @@ export default function CoachOnboarding() {
 
           {/* ── Step 5: Feedback / Baseline ── */}
           {currentStep === 'feedback' && (
-            <StepContent
-              title={lang === 'filipino' ? 'Handa na ang iyong baseline!' : 'Your baseline is ready!'}
-              subtitle={
-                lang === 'filipino'
-                  ? 'Kinalkula mula sa iyong sukat, edad, at kasarian'
-                  : 'Calculated from your body metrics & metabolism'
-              }
-              stepKey="feedback"
-              validationError={validationError}
-              coach={coach}
-            >
-              <View style={styles.baselineCard}>
+            <StepContent>
+              <Animated.View style={[styles.baselineCard, { transform: [{ scale: baselineAnim }] }]}>
                 <View style={styles.baselineMetricRow}>
                   {/* BMI Metric Block */}
                   <View style={styles.metricBlock}>
@@ -717,7 +895,7 @@ export default function CoachOnboarding() {
                       : `Based on your baseline, your suggested focus is ${getGoalLabel(lang, suggestedGoal)}.`}
                   </Text>
                 </View>
-              </View>
+              </Animated.View>
 
               <PrimaryBtn label={getContinueLabel(lang)} onPress={() => goToStep(step + 1)} />
             </StepContent>
@@ -725,17 +903,7 @@ export default function CoachOnboarding() {
 
           {/* ── Step 6: Goal ── */}
           {currentStep === 'goal' && (
-            <StepContent
-              title={lang === 'filipino' ? 'Ano ang iyong layunin?' : 'What is your main goal?'}
-              subtitle={
-                lang === 'filipino'
-                  ? `Iminumungkahi namin ang ${getGoalLabel(lang, suggestedGoal)} batay sa iyong BMI`
-                  : `We recommend ${getGoalLabel(lang, suggestedGoal)} based on your BMI`
-              }
-              stepKey="goal"
-              validationError={validationError}
-              coach={coach}
-            >
+            <StepContent>
               <View style={styles.goalGrid}>
                 {goalKeys.map((g) => {
                   const iconName =
@@ -749,7 +917,7 @@ export default function CoachOnboarding() {
                   const isSuggested = g === suggestedGoal;
 
                   return (
-                    <Pressable
+                    <AnimatedPressable
                       key={g}
                       style={[
                         styles.goalCard,
@@ -768,6 +936,8 @@ export default function CoachOnboarding() {
                           coach.trigger('answer-success', { mood: 'happy', asset: 'streak' });
                         }
                       }}
+                      scaleTo={0.96}
+                      hapticStyle="selection"
                     >
                       {isSuggested && (
                         <View style={styles.recommendedBadge}>
@@ -786,7 +956,7 @@ export default function CoachOnboarding() {
                       {form.goal === g && (
                         <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
                       )}
-                    </Pressable>
+                    </AnimatedPressable>
                   );
                 })}
               </View>
@@ -798,23 +968,19 @@ export default function CoachOnboarding() {
 
           {/* ── Step 7: Activity ── */}
           {currentStep === 'activity' && (
-            <StepContent
-              title={lang === 'filipino' ? 'Gaano ka ka-aktibo?' : 'How active are you?'}
-              subtitle={lang === 'filipino' ? 'Araw-araw na galaw at ehersisyo' : 'Include work and daily movement'}
-              stepKey="activity"
-              validationError={validationError}
-              coach={coach}
-            >
+            <StepContent>
               <View style={styles.activityWrap}>
                 <View style={styles.stepperRow}>
                   {[1, 2, 3, 4, 5].map((lvl) => (
-                    <Pressable
+                    <AnimatedPressable
                       key={lvl}
                       style={[styles.stepperPill, form.activityLevel === lvl && styles.stepperPillActive]}
                       onPress={() => {
                         updateForm({ activityLevel: lvl });
                         coach.trigger('answer-success', { mood: 'energetic', asset: 'flex' });
                       }}
+                      scaleTo={0.92}
+                      hapticStyle="selection"
                     >
                       <Text style={[styles.stepperPillNum, form.activityLevel === lvl && styles.stepperPillNumActive]}>
                         {lvl}
@@ -822,7 +988,7 @@ export default function CoachOnboarding() {
                       <Text style={[styles.stepperPillSub, form.activityLevel === lvl && styles.stepperPillSubActive]}>
                         {lvl === 1 ? 'None' : lvl === 2 ? 'Light' : lvl === 3 ? 'Mod' : lvl === 4 ? 'Active' : 'Extra'}
                       </Text>
-                    </Pressable>
+                    </AnimatedPressable>
                   ))}
                 </View>
                 <View style={styles.activityInfoCard}>
@@ -845,16 +1011,10 @@ export default function CoachOnboarding() {
 
           {/* ── Step 8: Health conditions ── */}
           {currentStep === 'health' && (
-            <StepContent
-              title={lang === 'filipino' ? 'May kondisyon sa kalusugan?' : 'Any health conditions?'}
-              subtitle={lang === 'filipino' ? 'Aayusin namin ang mga payo nang ligtas' : "We'll tailor nutrition advice safely"}
-              stepKey="health"
-              validationError={validationError}
-              coach={coach}
-            >
+            <StepContent>
               <View style={styles.choiceChipsRow}>
                 {(['no', 'yes', 'skip'] as const).map((a) => (
-                  <Pressable
+                  <AnimatedPressable
                     key={a}
                     style={[styles.choiceChip, form.healthAnswer === a && styles.choiceChipActive]}
                     onPress={() => {
@@ -873,6 +1033,8 @@ export default function CoachOnboarding() {
                         setHealthModalOpen(true);
                       }
                     }}
+                    scaleTo={0.96}
+                    hapticStyle="selection"
                   >
                     <Text style={[styles.choiceChipText, form.healthAnswer === a && styles.choiceChipTextActive]}>
                       {a === 'no' ? getNoLabel(lang) : a === 'yes' ? getYesLabel(lang) : getSkipLabel(lang)}
@@ -880,7 +1042,7 @@ export default function CoachOnboarding() {
                     {form.healthAnswer === a && (
                       <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
                     )}
-                  </Pressable>
+                  </AnimatedPressable>
                 ))}
               </View>
 
@@ -892,15 +1054,17 @@ export default function CoachOnboarding() {
                         ? `${form.healthConditions.length} ${t('common.selected') || 'selected'}`
                         : t('onboarding.searchConditions')}
                     </Text>
-                    <Pressable
+                    <AnimatedPressable
                       style={styles.openSheetBtn}
                       onPress={() => setHealthModalOpen(true)}
+                      scaleTo={0.94}
+                      hapticStyle="Light"
                     >
                       <Ionicons name="create-outline" size={16} color={Colors.primary} />
                       <Text style={styles.openSheetBtnText}>
                         {form.healthConditions.length > 0 ? (t('common.edit') || 'Edit') : (t('common.select') || 'Select')}
                       </Text>
-                    </Pressable>
+                    </AnimatedPressable>
                   </View>
                   {form.healthConditions.length > 0 && (
                     <View style={styles.tagChipsWrap}>
@@ -932,16 +1096,10 @@ export default function CoachOnboarding() {
 
           {/* ── Step 9: Allergies ── */}
           {currentStep === 'allergies' && (
-            <StepContent
-              title={lang === 'filipino' ? 'May mga allergy sa pagkain?' : 'Any food allergies?'}
-              subtitle={lang === 'filipino' ? 'Ihihiwalay namin ito sa iyong pagkain' : "We'll filter these out of your meals"}
-              stepKey="allergies"
-              validationError={validationError}
-              coach={coach}
-            >
+            <StepContent>
               <View style={styles.choiceChipsRow}>
                 {(['no', 'yes', 'skip'] as const).map((a) => (
-                  <Pressable
+                  <AnimatedPressable
                     key={a}
                     style={[styles.choiceChip, form.allergiesAnswer === a && styles.choiceChipActive]}
                     onPress={() => {
@@ -960,6 +1118,8 @@ export default function CoachOnboarding() {
                         setAllergiesModalOpen(true);
                       }
                     }}
+                    scaleTo={0.96}
+                    hapticStyle="selection"
                   >
                     <Text style={[styles.choiceChipText, form.allergiesAnswer === a && styles.choiceChipTextActive]}>
                       {a === 'no' ? getNoLabel(lang) : a === 'yes' ? getYesLabel(lang) : getSkipLabel(lang)}
@@ -967,7 +1127,7 @@ export default function CoachOnboarding() {
                     {form.allergiesAnswer === a && (
                       <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
                     )}
-                  </Pressable>
+                  </AnimatedPressable>
                 ))}
               </View>
 
@@ -979,15 +1139,17 @@ export default function CoachOnboarding() {
                         ? `${form.allergies.length} ${t('common.selected') || 'selected'}`
                         : t('onboarding.searchAllergens')}
                     </Text>
-                    <Pressable
+                    <AnimatedPressable
                       style={styles.openSheetBtn}
                       onPress={() => setAllergiesModalOpen(true)}
+                      scaleTo={0.94}
+                      hapticStyle="Light"
                     >
                       <Ionicons name="create-outline" size={16} color={Colors.primary} />
                       <Text style={styles.openSheetBtnText}>
                         {form.allergies.length > 0 ? (t('common.edit') || 'Edit') : (t('common.select') || 'Select')}
                       </Text>
-                    </Pressable>
+                    </AnimatedPressable>
                   </View>
                   {form.allergies.length > 0 && (
                     <View style={styles.tagChipsWrap}>
@@ -1019,13 +1181,7 @@ export default function CoachOnboarding() {
 
           {/* ── Step 10: Finish ── */}
           {currentStep === 'finish' && (
-            <StepContent
-              title={lang === 'filipino' ? 'Handa ka na!' : "You're all set!"}
-              subtitle={lang === 'filipino' ? 'Suriin ang iyong profile sa ibaba' : 'Review your customized profile below'}
-              stepKey="finish"
-              validationError={validationError}
-              coach={coach}
-            >
+            <StepContent>
               <ReviewSummary form={form} lang={lang} />
               <PrimaryBtn label={getGoToDashboardLabel(lang)} onPress={finishOnboarding} isLoading={saving} />
             </StepContent>
@@ -1043,9 +1199,14 @@ export default function CoachOnboarding() {
         <SafeAreaView style={styles.modalRoot}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{t('onboarding.searchConditions')}</Text>
-            <Pressable onPress={() => setHealthModalOpen(false)} style={styles.modalDoneBtn}>
+            <AnimatedPressable
+              onPress={() => setHealthModalOpen(false)}
+              style={styles.modalDoneBtn}
+              scaleTo={0.94}
+              hapticStyle="Light"
+            >
               <Text style={styles.modalDoneText}>{t('common.done') || 'Done'}</Text>
-            </Pressable>
+            </AnimatedPressable>
           </View>
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
             <SearchableSelectList
@@ -1075,9 +1236,14 @@ export default function CoachOnboarding() {
         <SafeAreaView style={styles.modalRoot}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{t('onboarding.searchAllergens')}</Text>
-            <Pressable onPress={() => setAllergiesModalOpen(false)} style={styles.modalDoneBtn}>
+            <AnimatedPressable
+              onPress={() => setAllergiesModalOpen(false)}
+              style={styles.modalDoneBtn}
+              scaleTo={0.94}
+              hapticStyle="Light"
+            >
               <Text style={styles.modalDoneText}>{t('common.done') || 'Done'}</Text>
-            </Pressable>
+            </AnimatedPressable>
           </View>
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
             <SearchableSelectList
@@ -1117,15 +1283,14 @@ export default function CoachOnboarding() {
 
 function PrimaryBtn({ label, onPress, isLoading }: { label: string; onPress: () => void; isLoading?: boolean }) {
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.primaryBtn,
-        pressed && !isLoading && { transform: [{ scale: 0.98 }], opacity: 0.9 },
-        isLoading && { opacity: 0.7 },
-      ]}
+    <AnimatedPressable
+      style={styles.primaryBtn}
       onPress={() => {
         if (!isLoading) onPress();
       }}
+      scaleTo={0.97}
+      hapticStyle="Light"
+      disabled={isLoading}
     >
       {isLoading ? (
         <ActivityIndicator color="#FFFFFF" />
@@ -1135,7 +1300,7 @@ function PrimaryBtn({ label, onPress, isLoading }: { label: string; onPress: () 
           <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 8 }} />
         </>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -1151,51 +1316,22 @@ function UnitToggle<T extends string>({
   return (
     <View style={styles.unitToggle}>
       {options.map((opt) => (
-        <Pressable
+        <AnimatedPressable
           key={opt}
           style={[styles.unitOption, selected === opt && styles.unitOptionActive]}
           onPress={() => onSelect(opt)}
+          scaleTo={0.94}
+          hapticStyle="Light"
         >
           <Text style={[styles.unitText, selected === opt && styles.unitTextActive]}>{opt}</Text>
-        </Pressable>
+        </AnimatedPressable>
       ))}
     </View>
   );
 }
 
-function StepContent({
-  title,
-  subtitle,
-  stepKey,
-  children,
-  validationError,
-  coach,
-}: {
-  title: string;
-  subtitle?: string;
-  stepKey: string;
-  children: React.ReactNode;
-  validationError?: string | null;
-  coach: ReturnType<typeof useCoachHoo>;
-}) {
-  return (
-    <View key={stepKey} style={styles.stepContent}>
-      <CoachBubble
-        title={validationError || title}
-        subtitle={validationError ? undefined : subtitle}
-        assetKey={coach.assetKey}
-        mood={coach.mood}
-        behavior={coach.behavior}
-        position="topCenter"
-        intensity={coach.intensity}
-        isKeyboardVisible={coach.isKeyboardVisible}
-        isReducedMotion={coach.isReducedMotion}
-        canTap={coach.canTap}
-        onMascotTap={() => coach.trigger('tap-mascot')}
-      />
-      <View style={styles.inputArea}>{children}</View>
-    </View>
-  );
+function StepContent({ children }: { children: React.ReactNode }) {
+  return <View style={styles.inputArea}>{children}</View>;
 }
 
 function ReviewSummary({ form, lang }: { form: FormData; lang: 'english' | 'filipino' }) {
@@ -1249,16 +1385,25 @@ function ReviewSummary({ form, lang }: { form: FormData; lang: 'english' | 'fili
   return (
     <View style={styles.bentoSummaryCard}>
       <View style={styles.bentoSummaryHeader}>
-        <Ionicons name="clipboard-outline" size={15} color={Colors.primary} />
-        <Text style={styles.bentoSummaryTitle}>
-          {isEn ? 'Profile Summary' : 'Buod ng Profile'}
-        </Text>
+        <ExpoImage
+          source={require('../assets/mascot/nokma_logo_badge.png')}
+          style={styles.summaryBadgeLogo}
+          contentFit="contain"
+        />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.bentoSummaryTitle}>
+            {isEn ? 'NOKMA PROFILE SUMMARY' : 'BUOD NG PROFILE'}
+          </Text>
+          <Text style={styles.bentoSummarySubtitle}>
+            {isEn ? 'Your personalized coaching is ready' : 'Handa na ang iyong personalized coaching'}
+          </Text>
+        </View>
       </View>
       <View style={styles.bentoGrid}>
         {items.map((item) => (
           <View key={item.label} style={styles.bentoCell}>
             <View style={styles.bentoCellHeader}>
-              <Ionicons name={item.icon as any} size={13} color="#9CA3AF" />
+              <Ionicons name={item.icon as any} size={13} color={Colors.primary} />
               <Text style={styles.bentoCellLabel}>{item.label}</Text>
             </View>
             <Text style={styles.bentoCellValue} numberOfLines={1}>{item.value}</Text>
@@ -1270,7 +1415,7 @@ function ReviewSummary({ form, lang }: { form: FormData; lang: 'english' | 'fili
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F4F5F7' },
+  root: { flex: 1, backgroundColor: Colors.bg },
 
   topBar: {
     flexDirection: 'row',
@@ -1280,25 +1425,43 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xs,
   },
   backBtn: {
-    minWidth: 60,
+    minWidth: 64,
     minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  backText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  backBtnPlaceholder: {
+    minWidth: 64,
+    minHeight: 40,
+  },
+  backText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+
+  progressRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: Spacing.xs,
+  },
   progressBarContainer: {
     flex: 1,
-    height: 6,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 3,
-    marginHorizontal: Spacing.sm,
+    height: 7,
+    backgroundColor: '#EEDECB',
+    borderRadius: 4,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: Colors.primary,
-    borderRadius: 3,
+    borderRadius: 4,
+  },
+  stepIndicatorText: {
+    fontSize: 11,
+    fontWeight: FontWeight.bold,
+    color: Colors.textSecondary,
+    minWidth: 32,
+    textAlign: 'right',
   },
 
   scroll: {
@@ -1314,10 +1477,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  stepContent: {
-    gap: Spacing.md,
-  },
-
   inputArea: {
     gap: Spacing.md,
     marginTop: Spacing.xs,
@@ -1327,26 +1486,73 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
 
+  // Brand Hero Card (Step 0)
+  brandHeroCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#EEDECB',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: Spacing.sm,
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  brandHeroLogo: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+  },
+  brandHeroTextWrap: {
+    flex: 1,
+  },
+  brandHeroName: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.extrabold,
+    color: Colors.primary,
+    letterSpacing: 0.8,
+  },
+  brandHeroTagline: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: FontWeight.medium,
+    marginTop: 1,
+  },
+
   inputCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
+    borderColor: '#EEDECB',
+    borderRadius: 18,
     padding: 16,
     fontSize: FontSize.md,
-    color: '#111827',
+    color: '#1F2937',
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
     elevation: 1,
   },
   inputCardCentered: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
+    borderColor: '#EEDECB',
+    borderRadius: 18,
     padding: 16,
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    color: '#111827',
+    color: '#1F2937',
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
     elevation: 1,
   },
   inputFlex: { flex: 1 },
@@ -1358,22 +1564,22 @@ const styles = StyleSheet.create({
 
   unitToggle: {
     flexDirection: 'row',
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    borderColor: '#EEDECB',
     backgroundColor: '#FFFFFF',
   },
-  unitOption: { paddingHorizontal: 10, paddingVertical: 12, backgroundColor: '#FFFFFF' },
+  unitOption: { paddingHorizontal: 12, paddingVertical: 14, backgroundColor: '#FFFFFF' },
   unitOptionActive: { backgroundColor: Colors.primary },
   unitText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: '#4B5563' },
-  unitTextActive: { color: '#FFFFFF' },
+  unitTextActive: { color: '#FFFFFF', fontWeight: FontWeight.bold },
 
   sectionSpacer: { height: Spacing.sm },
   sectionTitle: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: '#1F2937',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
@@ -1385,7 +1591,7 @@ const styles = StyleSheet.create({
 
   optionsStack: {
     gap: 12,
-    marginTop: Spacing.md,
+    marginTop: Spacing.xs,
   },
   optionsRow: {
     flexDirection: 'row',
@@ -1395,18 +1601,22 @@ const styles = StyleSheet.create({
   optionCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
+    borderColor: '#EEDECB',
+    borderRadius: 18,
     paddingVertical: 18,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
     elevation: 1,
   },
   optionCardActive: {
     borderColor: Colors.primary,
-    backgroundColor: '#FFF0EC',
+    backgroundColor: '#FFF5EE',
   },
   optionCardText: {
     fontSize: FontSize.md,
@@ -1426,14 +1636,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
-    paddingVertical: 16,
+    borderColor: '#EEDECB',
+    borderRadius: 18,
+    paddingVertical: 18,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
     elevation: 1,
   },
   sexCardText: {
@@ -1445,17 +1659,17 @@ const styles = StyleSheet.create({
   // ── Baseline Card (Step 5: BMR + BMI) ──
   baselineCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    padding: 16,
+    borderColor: '#EEDECB',
+    padding: 18,
     gap: 14,
     marginVertical: Spacing.xs,
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 10,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
   },
   baselineMetricRow: {
     flexDirection: 'row',
@@ -1470,20 +1684,20 @@ const styles = StyleSheet.create({
   metricDivider: {
     width: 1,
     height: 54,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#EEDECB',
     marginHorizontal: 8,
   },
   metricLabel: {
     fontSize: 10,
     fontWeight: FontWeight.bold,
-    color: '#9CA3AF',
+    color: '#8FA4AE',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   metricValue: {
     fontSize: 26,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: '#1F2937',
   },
   metricUnit: {
     fontSize: FontSize.xs,
@@ -1512,7 +1726,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF7ED',
     borderWidth: 1,
     borderColor: '#FFEDD5',
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -1524,7 +1738,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // ── 2x2 Bento Goal Grid with Smart BMI Recommendation ──
+  // ── 2x2 Bento Goal Grid ──
   goalGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1536,19 +1750,23 @@ const styles = StyleSheet.create({
     width: '48.5%',
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
-    paddingVertical: 14,
+    borderColor: '#EEDECB',
+    borderRadius: 18,
+    paddingVertical: 16,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     position: 'relative',
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
     elevation: 1,
   },
   goalCardActive: {
     borderColor: Colors.primary,
-    backgroundColor: '#FFF0EC',
+    backgroundColor: '#FFF5EE',
   },
   goalCardSuggested: {
     borderColor: '#FDBA74',
@@ -1573,7 +1791,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F5EBE0',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1591,7 +1809,7 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
   },
 
-  // ── 5-Pill Activity Stepper & Live Inspector ──
+  // ── 5-Pill Activity Stepper ──
   activityWrap: {
     gap: 12,
     marginVertical: Spacing.xs,
@@ -1605,11 +1823,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 14,
-    paddingVertical: 10,
+    borderColor: '#EEDECB',
+    borderRadius: 16,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
     elevation: 1,
   },
   stepperPillActive: {
@@ -1627,7 +1849,7 @@ const styles = StyleSheet.create({
   stepperPillSub: {
     fontSize: 10,
     fontWeight: FontWeight.medium,
-    color: '#9CA3AF',
+    color: '#8FA4AE',
     marginTop: 2,
   },
   stepperPillSubActive: {
@@ -1635,11 +1857,15 @@ const styles = StyleSheet.create({
   },
   activityInfoCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    borderColor: '#EEDECB',
     padding: 14,
     gap: 4,
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
     elevation: 1,
   },
   activityInfoHeader: {
@@ -1650,7 +1876,7 @@ const styles = StyleSheet.create({
   activityInfoTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: '#1F2937',
   },
   activityInfoDesc: {
     fontSize: FontSize.xs,
@@ -1668,18 +1894,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
-    paddingVertical: 14,
+    borderColor: '#EEDECB',
+    borderRadius: 18,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 6,
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
     elevation: 1,
   },
   choiceChipActive: {
     borderColor: Colors.primary,
-    backgroundColor: '#FFF0EC',
+    backgroundColor: '#FFF5EE',
   },
   choiceChipText: {
     fontSize: FontSize.sm,
@@ -1693,12 +1923,16 @@ const styles = StyleSheet.create({
 
   conditionSummaryCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    borderColor: '#EEDECB',
     padding: 14,
     gap: 10,
     marginTop: Spacing.xs,
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
     elevation: 1,
   },
   conditionSummaryHeader: {
@@ -1715,8 +1949,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
     borderRadius: 8,
     backgroundColor: '#FFF0EC',
   },
@@ -1731,7 +1965,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tagChip: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F5EBE0',
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -1743,7 +1977,7 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   tagChipMore: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#EEDECB',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 5,
@@ -1754,30 +1988,44 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
   },
 
-  // ── Step 10: 2-Column Bento Summary Card ──
+  // ── Step 10: Bento Summary Card ──
   bentoSummaryCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    padding: 14,
-    gap: 10,
-    elevation: 1,
+    borderColor: '#EEDECB',
+    padding: 16,
+    gap: 12,
+    shadowColor: '#3A2010',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 2,
   },
   bentoSummaryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingBottom: 4,
+    gap: 10,
+    paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#F5EBE0',
+  },
+  summaryBadgeLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
   },
   bentoSummaryTitle: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 11,
+    fontWeight: FontWeight.extrabold,
+    color: Colors.primary,
+    letterSpacing: 0.6,
+  },
+  bentoSummarySubtitle: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: FontWeight.medium,
+    marginTop: 1,
   },
   bentoGrid: {
     flexDirection: 'row',
@@ -1787,8 +2035,8 @@ const styles = StyleSheet.create({
   },
   bentoCell: {
     width: '48.5%',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 10,
+    backgroundColor: '#FAF6EE',
+    borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 10,
     gap: 2,
@@ -1800,27 +2048,27 @@ const styles = StyleSheet.create({
   },
   bentoCellLabel: {
     fontSize: 10,
-    color: '#9CA3AF',
+    color: '#8FA4AE',
     fontWeight: FontWeight.medium,
   },
   bentoCellValue: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: '#1F2937',
   },
 
   // ── Buttons ──
   primaryBtn: {
     alignSelf: 'stretch',
     backgroundColor: Colors.primary,
-    borderRadius: 16,
+    borderRadius: 18,
     paddingVertical: 16,
     paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: Colors.primary,
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 10,
     elevation: 4,
@@ -1841,9 +2089,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#EEDECB',
   },
-  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: '#111827' },
+  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: '#1F2937' },
   modalDoneBtn: {
     backgroundColor: Colors.primary,
     paddingHorizontal: 16,

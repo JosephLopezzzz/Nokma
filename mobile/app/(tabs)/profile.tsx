@@ -505,7 +505,14 @@ export default function ProfileScreen() {
       </View>
 
 
-      <Text style={styles.version}>{t('profile.version')}</Text>
+      <View style={styles.brandingFooter}>
+        <Image
+          source={require('../../assets/mascot/nokma_logo_badge.png')}
+          style={styles.brandingFooterLogo}
+          resizeMode="contain"
+        />
+        <Text style={styles.version}>{t('profile.version')}</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -572,7 +579,9 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1, borderColor: `${colors.error}40`, backgroundColor: `${colors.error}10`,
   },
   logoutText: { fontSize: FontSize.md, color: colors.error, fontWeight: FontWeight.semibold },
-  version:    { fontSize: FontSize.xs, color: colors.textMuted, textAlign: 'center', marginTop: Spacing.sm },
+  brandingFooter: { alignItems: 'center', justifyContent: 'center', marginTop: Spacing.md, gap: 6 },
+  brandingFooterLogo: { width: 36, height: 36, borderRadius: 10 },
+  version:    { fontSize: FontSize.xs, color: colors.textMuted, textAlign: 'center' },
 
   // Replay tutorial
   replayBtn: {
