@@ -10,7 +10,6 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
-import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import MealSection from '../../components/MealSection';
 import AnimatedPressable from '../../components/AnimatedPressable';
 import { useStreak } from '../../hooks/useStreak';
@@ -232,17 +231,44 @@ export default function ProgressScreen() {
       */}
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
-        <SegmentedControl
-          values={[t('dash.todaysMeals') || 'Diary', 'Charts']}
-          selectedIndex={activeTab === 'diary' ? 0 : 1}
-          onChange={(event) => {
-            setActiveTab(event.nativeEvent.selectedSegmentIndex === 0 ? 'diary' : 'charts');
-          }}
-          tintColor={colors.primary}
-          fontStyle={{ color: colors.textSecondary }}
-          activeFontStyle={{ color: colors.bg }}
-          style={{ marginBottom: Spacing.sm }}
-        />
+        {/* Navigation Tabs (Diary vs Charts) */}
+        <View style={styles.segmentedControl}>
+          <AnimatedPressable
+            style={[styles.segmentBtn, activeTab === 'diary' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('diary')}
+            scaleTo={0.97}
+            hapticStyle="selection"
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'diary' }}
+          >
+            <Ionicons
+              name={activeTab === 'diary' ? 'restaurant' : 'restaurant-outline'}
+              size={16}
+              color={activeTab === 'diary' ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[styles.segmentText, activeTab === 'diary' && styles.segmentTextActive]}>
+              {t('dash.todaysMeals') || 'Diary'}
+            </Text>
+          </AnimatedPressable>
+
+          <AnimatedPressable
+            style={[styles.segmentBtn, activeTab === 'charts' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('charts')}
+            scaleTo={0.97}
+            hapticStyle="selection"
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'charts' }}
+          >
+            <Ionicons
+              name={activeTab === 'charts' ? 'stats-chart' : 'stats-chart-outline'}
+              size={16}
+              color={activeTab === 'charts' ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[styles.segmentText, activeTab === 'charts' && styles.segmentTextActive]}>
+              Charts
+            </Text>
+          </AnimatedPressable>
+        </View>
 
         {activeTab === 'charts' && (
           <View style={[styles.headerTop, { marginTop: Spacing.md }]}>
@@ -709,18 +735,23 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.bgElevated,
     borderRadius: Radius.full,
     padding: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   segmentBtn: {
     flex: 1,
-    paddingVertical: 10,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
     borderRadius: Radius.full,
+    gap: 6,
   },
   segmentBtnActive: {
     backgroundColor: colors.bgCard,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -731,6 +762,7 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   segmentTextActive: {
     color: colors.primary,
+    fontWeight: FontWeight.bold,
   },
   headerTop: {
     flexDirection: 'row',
@@ -745,7 +777,7 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   timeframeChips: {
     flexDirection: 'row',
     gap: Spacing.xs,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.bgElevated,
     padding: 3,
     borderRadius: Radius.full,
     borderWidth: 1,
@@ -753,7 +785,7 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   chip: {
     paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: Radius.full,
   },
   chipActive: {
@@ -762,10 +794,11 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   chipText: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,
-    color: colors.textMuted,
+    color: colors.textSecondary,
   },
   chipTextActive: {
-    color: '#ffffff',
+    color: colors.textInverse || '#ffffff',
+    fontWeight: FontWeight.bold,
   },
   scrollContent: {
     padding: Spacing.md,
