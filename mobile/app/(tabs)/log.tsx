@@ -13,7 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { getMealTypeLabel, getCookingMethodLabel, labelForOptionKey } from '../../constants/i18n';
 import ManualEntryForm from '../../components/ManualEntryForm';
-import { FontSize, FontWeight, Spacing, Radius, MEAL_TYPES, ThemeColors } from '../../constants/theme';
+import { FontSize, FontWeight, Spacing, Radius, MEAL_TYPES, ThemeColors, getMealMeta, getMacroFg, logShadows } from '../../constants/theme';
 import type { LogItem } from '../../types';
 import { calculateApi } from '../../services/api';
 import { resolveLogItemKeywords, findAllergenMatches } from '../../services/allergenService';
@@ -28,7 +28,7 @@ export default function LogMealScreen() {
   const { showToast } = useToast();
   const { lang, t } = useLanguage();
   const { user } = useAuth();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const styles = React.useMemo(() => getStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const [mealType, setMealType] = useState<string>('breakfast');
@@ -40,6 +40,7 @@ export default function LogMealScreen() {
   const [networkStatus, setNetworkStatus] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
   const params = useLocalSearchParams();
+  const activeMeal = React.useMemo(() => getMealMeta(isDark, mealType), [isDark, mealType]);
 
   useEffect(() => {
     if (params.openScanner === 'true') {
@@ -186,31 +187,73 @@ export default function LogMealScreen() {
       <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
         <View style={styles.headerTitleRow}>
           <Text style={styles.title}>{t('log.title')}</Text>
-          {!networkStatus && (
-            <Ionicons name="cloud-offline" size={24} color={colors.textMuted} />
-          )}
+          <View style={styles.headerRightRow}>
+            {items.length > 0 && (
+              <View style={[styles.countBadge, { backgroundColor: activeMeal.bg, borderColor: activeMeal.border }]}>
+                <View style={[styles.countDot, { backgroundColor: activeMeal.fg }]} />
+                <Text style={[styles.countBadgeText, { color: activeMeal.fg }]}>
+                  {items.length}{preview ? ` · ${Math.round(preview.calories)} kcal` : ''}
+                </Text>
+              </View>
+            )}
+            {!networkStatus && (
+              <Ionicons name="cloud-offline" size={24} color={colors.textMuted} />
+            )}
+          </View>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mealTypeScroll}>
-          {MEAL_TYPES.map((mt) => (
-            <AnimatedPressable
-              key={mt.key}
-              style={[styles.mealTypeBtn, mealType === mt.key && { backgroundColor: `${mt.color}20`, borderColor: mt.color }]}
-              onPress={() => setMealType(mt.key)}
-              scaleTo={0.95}
-            >
-              <Ionicons name={mt.icon as any} size={16} color={mealType === mt.key ? mt.color : colors.textMuted} />
-              <Text style={[styles.mealTypeText, mealType === mt.key && { color: mt.color }]}>
-                {getMealTypeLabel(lang, mt.key)}
-              </Text>
-            </AnimatedPressable>
-          ))}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.mealTypeScroll}
+          accessibilityRole="radiogroup"
+        >
+          {MEAL_TYPES.map((mt) => {
+            const meta = getMealMeta(isDark, mt.key);
+            const selected = mealType === mt.key;
+            return (
+              <AnimatedPressable
+                key={mt.key}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                accessibilityLabel={getMealTypeLabel(lang, mt.key)}
+                style={[
+                  styles.mealTypeBtn,
+                  selected && {
+                    backgroundColor: meta.bg,
+                    borderColor: meta.border,
+                    borderWidth: 1.5,
+                  },
+                ]}
+                onPress={() => setMealType(mt.key)}
+                scaleTo={0.95}
+              >
+                <Ionicons
+                  name={(selected ? mt.iconActive : mt.icon) as any}
+                  size={16}
+                  color={selected ? meta.fg : colors.textSecondary}
+                />
+                <Text style={[
+                  styles.mealTypeText,
+                  selected && { color: meta.fg, fontWeight: FontWeight.bold },
+                ]}>
+                  {getMealTypeLabel(lang, mt.key)}
+                </Text>
+                {selected && (
+                  <Ionicons name="checkmark-circle" size={14} color={meta.fg} />
+                )}
+              </AnimatedPressable>
+            );
+          })}
         </ScrollView>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {items.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>{t('log.itemsToLog', { count: items.length })}</Text>
+          <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: activeMeal.fg }]}>
+            <View style={styles.cardTitleRow}>
+              <View style={[styles.mealDot, { backgroundColor: activeMeal.fg }]} />
+              <Text style={styles.sectionTitleNoMargin}>{t('log.itemsToLog', { count: items.length })}</Text>
+            </View>
             {items.map((item, idx) => {
               const label = item.type === 'manual'
                 ? `${(item as any).food_type} · ${getCookingMethodLabel(lang, (item as any).method ?? 'raw')} · ${item.quantity_g}g${(item as any).bone_weight_g && (item as any).bone_weight_g > 0 ? ` · 🦴 ${(item as any).bone_weight_g}g` : ((item as any).with_bones ? ' · 🦴' : '')}`
@@ -230,13 +273,18 @@ export default function LogMealScreen() {
             {preview && (
               <View style={styles.previewRow}>
                 {[
-                  { label: t('macro.kcal'), value: preview.calories, color: colors.calories },
-                  { label: 'P',    value: preview.protein,  color: colors.protein },
-                  { label: 'C',    value: preview.carbs,    color: colors.carbs },
-                  { label: 'F',    value: preview.fat,      color: colors.fat },
+                  { key: 'calories', label: t('macro.kcal'), value: preview.calories, color: colors.calories },
+                  { key: 'protein',  label: 'P', value: preview.protein, color: colors.protein },
+                  { key: 'carbs',    label: 'C', value: preview.carbs,   color: colors.carbs },
+                  { key: 'fat',      label: 'F', value: preview.fat,     color: colors.fat },
                 ].map((m) => (
-                  <View key={m.label} style={[styles.previewPill, { backgroundColor: `${m.color}15` }]}>
-                    <Text style={[styles.previewValue, { color: m.color }]}>{Math.round(m.value)}</Text>
+                  <View
+                    key={m.label}
+                    style={[styles.previewPill, { backgroundColor: `${m.color}22`, borderColor: `${m.color}55` }]}
+                  >
+                    <Text style={[styles.previewValue, { color: getMacroFg(isDark, m.key) }]}>
+                      {Math.round(m.value)}
+                    </Text>
                     <Text style={styles.previewLabel}>{m.label}</Text>
                   </View>
                 ))}
@@ -249,11 +297,20 @@ export default function LogMealScreen() {
           <Text style={styles.sectionTitle}>{t('log.manualEntry')}</Text>
           
           <AnimatedPressable style={styles.scanBtn} onPress={() => setShowScanner(true)} disabled={loading} scaleTo={0.97}>
-            <Ionicons name="barcode-outline" size={24} color={colors.primary} />
-            <Text style={styles.scanBtnText}>Scan Nutrition Facts Label</Text>
+            <Ionicons name="barcode-outline" size={22} color={colors.primary} />
+            <View style={styles.scanBtnTextWrap}>
+              <Text style={styles.scanBtnText}>Scan Nutrition Facts Label</Text>
+              <Text style={styles.scanBtnSub}>Camera · works offline</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </AnimatedPressable>
 
-          <ManualEntryForm onSubmit={confirmAddItem} />
+          <ManualEntryForm
+            onSubmit={confirmAddItem}
+            accentFg={activeMeal.fg}
+            accentBg={activeMeal.bg}
+            accentBorder={activeMeal.border}
+          />
         </View>
 
         <AnimatedPressable
@@ -261,13 +318,20 @@ export default function LogMealScreen() {
           onPress={handleSubmit}
           disabled={loading || items.length === 0}
           scaleTo={0.96}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: loading || items.length === 0 }}
         >
           {loading
             ? <ActivityIndicator color={colors.textInverse} />
             : <>
-                <Ionicons name="checkmark-circle-outline" size={20} color={colors.textInverse} />
-                <Text style={styles.submitText}>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={20}
+                  color={items.length === 0 ? colors.textMuted : colors.textInverse}
+                />
+                <Text style={[styles.submitText, items.length === 0 && styles.submitTextDisabled]}>
                   {t('log.submit', { mealType: getMealTypeLabel(lang, mealType), count: items.length })}
+                  {preview ? ` · ${Math.round(preview.calories)} kcal` : ''}
                 </Text>
               </>
           }
@@ -303,6 +367,29 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  headerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  countBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+  },
+  countDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  countBadgeText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+  },
   mealTypeScroll: {
     flexDirection: 'row',
   },
@@ -312,16 +399,13 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
+    minHeight: 44,
     borderRadius: Radius.full,
     borderWidth: 1,
     borderColor: colors.border,
     marginRight: 8,
     backgroundColor: colors.bgInput,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    ...logShadows.pill,
   },
   mealTypeText: {
     fontSize: FontSize.sm,
@@ -348,6 +432,22 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: FontWeight.bold,
     color: colors.textPrimary,
     marginBottom: Spacing.sm,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: Spacing.sm,
+  },
+  mealDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  sectionTitleNoMargin: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: colors.textPrimary,
   },
   pendingItem: {
     flexDirection: 'row',
@@ -388,6 +488,9 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: Radius.md,
+    borderWidth: 1,
+    flex: 1,
+    marginHorizontal: 2,
   },
   previewValue: {
     fontSize: FontSize.lg,
@@ -407,30 +510,43 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     borderRadius: Radius.lg,
     marginTop: Spacing.md,
     backgroundColor: colors.primary,
+    ...logShadows.cta(colors.primary),
   },
   submitBtnDisabled: {
-    backgroundColor: colors.border,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   submitText: {
     color: colors.textInverse,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
   },
+  submitTextDisabled: {
+    color: colors.textMuted,
+  },
   scanBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.primaryGlow,
+    gap: 10,
+    backgroundColor: colors.bgElevated,
     padding: Spacing.md,
     borderRadius: Radius.lg,
     marginBottom: Spacing.lg,
     borderWidth: 1,
-    borderColor: `${colors.primary}40`,
+    borderColor: colors.border,
+  },
+  scanBtnTextWrap: {
+    flex: 1,
+    gap: 2,
   },
   scanBtnText: {
     color: colors.primary,
     fontSize: FontSize.md,
     fontWeight: FontWeight.semibold,
+  },
+  scanBtnSub: {
+    color: colors.textMuted,
+    fontSize: FontSize.xs,
   },
 });

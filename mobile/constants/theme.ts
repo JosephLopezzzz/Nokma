@@ -1,4 +1,5 @@
 // ─── Nokma Design System ──────────────────────────────────────────────────
+import { Platform } from 'react-native';
 
 export const lightColors = {
   // Backgrounds
@@ -131,13 +132,95 @@ export const FontWeight = {
   extrabold:  '800' as const,
 };
 
-// Meal type metadata
+// ─── Meal tokens (decoupled from macros) ────────────────────────────────────
+// Meal hues are intentionally distinct from macro hues (golden/peach/mint/teal).
+// Each meal has a theme-aware { bg, border, fg, iconBg } set so pill text meets
+// WCAG AA contrast on both light and dark surfaces.
+export interface MealToken {
+  bg:     string;
+  border: string;
+  fg:     string;
+  iconBg: string;
+}
+
+export const mealTokensLight: Record<string, MealToken> = {
+  breakfast: { bg: '#FEF3C7', border: '#F59E0B66', fg: '#92400E', iconBg: '#F59E0B26' },
+  lunch:     { bg: '#E0F2FE', border: '#0EA5E966', fg: '#0369A1', iconBg: '#0EA5E926' },
+  dinner:    { bg: '#E0E7FF', border: '#6366F166', fg: '#4338CA', iconBg: '#6366F126' },
+  snack:     { bg: '#FCE7F3', border: '#EC489966', fg: '#BE185D', iconBg: '#EC489926' },
+};
+
+export const mealTokensDark: Record<string, MealToken> = {
+  breakfast: { bg: '#F59E0B2E', border: '#F59E0B55', fg: '#FCD34D', iconBg: '#F59E0B26' },
+  lunch:     { bg: '#0EA5E92E', border: '#0EA5E955', fg: '#7DD3FC', iconBg: '#0EA5E926' },
+  dinner:    { bg: '#6366F12E', border: '#6366F155', fg: '#A5B4FC', iconBg: '#6366F126' },
+  snack:     { bg: '#EC48992E', border: '#EC489955', fg: '#F9A8D4', iconBg: '#EC489926' },
+};
+
+// Darkened macro foregrounds for small text on tinted pill backgrounds.
+// Raw macro hexes (e.g. mint #9BE1C8) fail contrast on white; these pass AA.
+export const macroFgLight: Record<string, string> = {
+  calories: '#9A5B13',
+  protein:  '#B44A12',
+  carbs:    '#1E7E5C',
+  fat:      '#2F7D6B',
+};
+
+export const macroFgDark: Record<string, string> = {
+  calories: '#F5B66A',
+  protein:  '#FFBA89',
+  carbs:    '#AEEFE4',
+  fat:      '#8BCCB8',
+};
+
+export function getMacroFg(isDark: boolean, key: string): string {
+  const map = isDark ? macroFgDark : macroFgLight;
+  return map[key] ?? (isDark ? darkColors.textPrimary : lightColors.textPrimary);
+}
+
+// Meal type metadata (icons + labels; colors resolved per-theme via getMealMeta)
 export const MEAL_TYPES = [
-  { key: 'breakfast', label: 'Breakfast', color: Colors.breakfast, icon: 'sunny-outline' },
-  { key: 'lunch',     label: 'Lunch',     color: Colors.lunch,     icon: 'restaurant-outline' },
-  { key: 'dinner',    label: 'Dinner',    color: Colors.dinner,    icon: 'moon-outline' },
-  { key: 'snack',     label: 'Snack',     color: Colors.snack,     icon: 'cafe-outline' },
+  { key: 'breakfast', label: 'Breakfast', color: '#92400E', icon: 'sunny-outline', iconActive: 'sunny' },
+  { key: 'lunch',     label: 'Lunch',     color: '#0369A1', icon: 'restaurant-outline', iconActive: 'restaurant' },
+  { key: 'dinner',    label: 'Dinner',    color: '#4338CA', icon: 'moon-outline', iconActive: 'moon' },
+  { key: 'snack',     label: 'Snack',     color: '#BE185D', icon: 'cafe-outline', iconActive: 'cafe' },
 ] as const;
+
+export type MealTypeKey = typeof MEAL_TYPES[number]['key'];
+
+export function getMealMeta(isDark: boolean, key: string): MealToken & { key: string; icon: string; iconActive: string; label: string } {
+  const tokens = isDark ? mealTokensDark : mealTokensLight;
+  const base = MEAL_TYPES.find((m) => m.key === key) ?? MEAL_TYPES[0];
+  const token = tokens[key] ?? tokens[base.key];
+  return { key: base.key, icon: base.icon, iconActive: base.iconActive, label: base.label, ...token };
+}
+
+// ─── Log-screen shadows (no squares on Android) ─────────────────────────────
+// Android ignores shadowColor and renders elevation as a hardgedged grey slab,
+// which reads as a "square" behind rounded pills/buttons. So Android gets
+// elevation 0 + border emphasis (borders are set at the call site); iOS keeps
+// the soft blur shadows.
+export const logShadows = {
+  pill: Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+    },
+    default: {},
+  }),
+  cta: (primaryHex: string) =>
+    Platform.select({
+      ios: {
+        shadowColor: primaryHex,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+      },
+      default: {},
+    }),
+} as const;
 
 export const COOKING_METHODS = [
   { key: 'raw',       label: 'Raw' },

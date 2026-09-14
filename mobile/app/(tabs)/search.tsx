@@ -11,7 +11,7 @@ import { findAllergenMatches } from '../../services/allergenService';
 import FoodCard from '../../components/FoodCard';
 import ScannerCamera from '../../components/ScannerCamera';
 import { ProgressiveNutritionData } from '../../services/nutritionScanner';
-import { FontSize, FontWeight, Spacing, Radius, MEAL_TYPES, ThemeColors } from '../../constants/theme';
+import { FontSize, FontWeight, Spacing, Radius, MEAL_TYPES, ThemeColors, getMealMeta } from '../../constants/theme';
 import type { Food, Recipe, RestaurantFood } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import AnimatedPressable from '../../components/AnimatedPressable';
@@ -118,7 +118,7 @@ export default function SearchScreen() {
   const { user } = useAuth();
   const { logMeal, remaining, targets, meals } = useMeals();
   const { lang, t } = useLanguage();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const styles = React.useMemo(() => getStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
@@ -763,28 +763,31 @@ export default function SearchScreen() {
               {pendingLogItem?.item ? t('search.selectMealType', { name: pendingLogItem.item.name }) : t('log.title')}
             </Text>
             
-            {MEAL_TYPES.map((mt) => (
-              <Pressable
-                key={mt.key}
-                style={({ pressed }) => [
-                  styles.mealTypeOption,
-                  { borderColor: mt.color },
-                  pressed && { opacity: 0.8, backgroundColor: mt.color + '10' }
-                ]}
-                onPress={() => {
-                  if (pendingLogItem) {
-                    performLog(pendingLogItem.item, pendingLogItem.type, pendingLogItem.defaultQty, mt.key);
-                  }
-                  setMealTypeModalVisible(false);
-                  setPendingLogItem(null);
-                }}
-              >
-                <Ionicons name={mt.icon as any} size={20} color={mt.color} />
-                <Text style={[styles.mealTypeOptionText, { color: mt.color }]}>
-                  {getMealTypeLabel(lang, mt.key)}
-                </Text>
-              </Pressable>
-            ))}
+            {MEAL_TYPES.map((mt) => {
+              const meta = getMealMeta(isDark, mt.key);
+              return (
+                <Pressable
+                  key={mt.key}
+                  style={({ pressed }) => [
+                    styles.mealTypeOption,
+                    { borderColor: meta.border, backgroundColor: meta.bg },
+                    pressed && { opacity: 0.8 }
+                  ]}
+                  onPress={() => {
+                    if (pendingLogItem) {
+                      performLog(pendingLogItem.item, pendingLogItem.type, pendingLogItem.defaultQty, mt.key);
+                    }
+                    setMealTypeModalVisible(false);
+                    setPendingLogItem(null);
+                  }}
+                >
+                  <Ionicons name={mt.icon as any} size={20} color={meta.fg} />
+                  <Text style={[styles.mealTypeOptionText, { color: meta.fg }]}>
+                    {getMealTypeLabel(lang, mt.key)}
+                  </Text>
+                </Pressable>
+              );
+            })}
 
             <Pressable
               style={({ pressed }) => [styles.mealTypeCancel, pressed && { opacity: 0.7 }]}

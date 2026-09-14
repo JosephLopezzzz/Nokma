@@ -15,18 +15,28 @@ import AnimatedPressable from './AnimatedPressable';
 
 interface ManualEntryFormProps {
   onSubmit: (item: LogManualItem) => void;
+  /** Meal-tint propagated from the Log screen selector (theme-aware, AA-safe). */
+  accentFg?:     string;
+  accentBg?:     string;
+  accentBorder?: string;
+}
+
+export interface ChipTint {
+  bg:     string;
+  border: string;
+  fg:     string;
 }
 
 type ChipListProps<T extends string> = {
   options:  readonly { key: T; label: string }[];
   value:    T;
   onChange: (val: T) => void;
-  color?:   string;
+  tint?:    ChipTint;
 };
 
-function ChipList<T extends string>({ options, value, onChange, color }: ChipListProps<T>) {
+function ChipList<T extends string>({ options, value, onChange, tint }: ChipListProps<T>) {
   const { colors } = useTheme();
-  const chipColor = color || colors.primary;
+  const active = tint ?? { bg: colors.primaryGlow, border: colors.primary, fg: colors.primary };
   const styles = React.useMemo(() => getStyles(colors), [colors]);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
@@ -35,11 +45,13 @@ function ChipList<T extends string>({ options, value, onChange, color }: ChipLis
         return (
           <AnimatedPressable
             key={opt.key}
-            style={[styles.chip, selected && { backgroundColor: chipColor, borderColor: chipColor }]}
+            accessibilityRole="radio"
+            accessibilityState={{ selected }}
+            style={[styles.chip, selected && { backgroundColor: active.bg, borderColor: active.border, borderWidth: 1.5 }]}
             onPress={() => onChange(opt.key)}
             scaleTo={0.92}
           >
-            <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{opt.label}</Text>
+            <Text style={[styles.chipText, selected && { color: active.fg, fontWeight: FontWeight.bold }]}>{opt.label}</Text>
           </AnimatedPressable>
         );
       })}
@@ -48,11 +60,12 @@ function ChipList<T extends string>({ options, value, onChange, color }: ChipLis
 }
 
 function FoodTypeChips({
-  value, onChange,
+  value, onChange, tint,
 }: {
-  value: string; onChange: (v: string) => void;
+  value: string; onChange: (v: string) => void; tint?: ChipTint;
 }) {
   const { colors } = useTheme();
+  const active = tint ?? { bg: colors.primaryGlow, border: colors.primary, fg: colors.primary };
   const styles = React.useMemo(() => getStyles(colors), [colors]);
   const options = FOOD_TYPES.map((f) => ({ key: f as string, label: f.replace(/-/g, ' ') }));
   return (
@@ -62,11 +75,13 @@ function FoodTypeChips({
         return (
           <AnimatedPressable
             key={opt.key}
-            style={[styles.chip, selected && { backgroundColor: colors.accent, borderColor: colors.accent }]}
+            accessibilityRole="radio"
+            accessibilityState={{ selected }}
+            style={[styles.chip, selected && { backgroundColor: active.bg, borderColor: active.border, borderWidth: 1.5 }]}
             onPress={() => onChange(opt.key)}
             scaleTo={0.92}
           >
-            <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{opt.label}</Text>
+            <Text style={[styles.chipText, selected && { color: active.fg, fontWeight: FontWeight.bold }]}>{opt.label}</Text>
           </AnimatedPressable>
         );
       })}
@@ -74,11 +89,15 @@ function FoodTypeChips({
   );
 }
 
-export default function ManualEntryForm({ onSubmit }: ManualEntryFormProps) {
+export default function ManualEntryForm({ onSubmit, accentFg, accentBg, accentBorder }: ManualEntryFormProps) {
   const { lang, t } = useLanguage();
   const { user } = useAuth();
   const { colors } = useTheme();
   const styles = React.useMemo(() => getStyles(colors), [colors]);
+  const tint: ChipTint | undefined = accentFg && accentBg && accentBorder
+    ? { fg: accentFg, bg: accentBg, border: accentBorder }
+    : undefined;
+  const activeTint: ChipTint = tint ?? { fg: colors.primary, bg: colors.primaryGlow, border: colors.primary };
   const [foodType,      setFoodType]      = useState('chicken');
   const [cookingMethod, setCookingMethod] = useState('raw');
   const [grams,         setGrams]         = useState('100');
@@ -129,7 +148,7 @@ export default function ManualEntryForm({ onSubmit }: ManualEntryFormProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.sectionLabel}>{t('form.foodType')}</Text>
-      <FoodTypeChips value={foodType} onChange={handleFoodTypeChange} />
+      <FoodTypeChips value={foodType} onChange={handleFoodTypeChange} tint={tint} />
 
       {/* Custom text override */}
       <TextInput
@@ -145,7 +164,7 @@ export default function ManualEntryForm({ onSubmit }: ManualEntryFormProps) {
         options={cookingOptions}
         value={cookingMethod as any}
         onChange={setCookingMethod as any}
-        color={colors.primary}
+        tint={tint}
       />
 
       <Text style={styles.sectionLabel}>{t('form.amountGrams')}</Text>
@@ -160,18 +179,28 @@ export default function ManualEntryForm({ onSubmit }: ManualEntryFormProps) {
 
       {/* Quick gram buttons */}
       <View style={styles.quickGrams}>
-        {['100', '150', '200', '250'].map((g) => (
-          <AnimatedPressable
-            key={g}
-            style={[styles.gramBtn, grams === g && styles.gramBtnActive]}
-            onPress={() => setGrams(g)}
-            scaleTo={0.93}
-          >
-            <Text style={[styles.gramBtnText, grams === g && styles.gramBtnTextActive]}>
-              {g}g
-            </Text>
-          </AnimatedPressable>
-        ))}
+        {['100', '150', '200', '250'].map((g) => {
+          const gramActive = grams === g;
+          return (
+            <AnimatedPressable
+              key={g}
+              style={[
+                styles.gramBtn,
+                gramActive && {
+                  backgroundColor: activeTint.bg,
+                  borderColor: activeTint.border,
+                  borderWidth: 1.5,
+                },
+              ]}
+              onPress={() => setGrams(g)}
+              scaleTo={0.93}
+            >
+              <Text style={[styles.gramBtnText, gramActive && { color: activeTint.fg, fontWeight: FontWeight.bold }]}>
+                {g}g
+              </Text>
+            </AnimatedPressable>
+          );
+        })}
       </View>
 
       <View style={styles.bonesContainer}>
@@ -220,7 +249,7 @@ export default function ManualEntryForm({ onSubmit }: ManualEntryFormProps) {
             { key: 'c',   label: t('macro.carbs'),    color: colors.carbs },
             { key: 'f',   label: t('macro.fat'),      color: colors.fat },
           ].map((m) => (
-            <View key={m.key} style={styles.macroInputBox}>
+            <View key={m.key} style={[styles.macroInputBox, { borderLeftWidth: 3, borderLeftColor: m.color }]}>
               <Text style={[styles.macroInputLabel, { color: m.color }]}>{m.label}</Text>
               <TextInput
                 style={styles.macroInput}
@@ -279,10 +308,6 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: FontSize.sm,
     color: colors.textSecondary,
   },
-  chipTextSelected: {
-    color: colors.textInverse,
-    fontWeight: FontWeight.semibold,
-  },
   input: {
     backgroundColor: colors.bgInput,
     borderRadius: Radius.md,
@@ -305,17 +330,9 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  gramBtnActive: {
-    backgroundColor: colors.primaryGlow,
-    borderColor: colors.primary,
-  },
   gramBtnText: {
     fontSize: FontSize.sm,
-    color: colors.textMuted,
-  },
-  gramBtnTextActive: {
-    color: colors.primary,
-    fontWeight: FontWeight.bold,
+    color: colors.textSecondary,
   },
   bonesContainer: {
     backgroundColor: colors.bgElevated,

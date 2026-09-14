@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { FontSize, FontWeight, Spacing, Radius, ThemeColors } from '../constants/theme';
 import type { Meal, MealItem } from '../types';
-import { MEAL_TYPES } from '../constants/theme';
+import { getMealMeta } from '../constants/theme';
 import { RECIPES_DB } from '../services/api';
 import { useMeals } from '../context/MealContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -110,11 +110,11 @@ function ItemRow({ item }: { item: MealItem }) {
 export default function MealSection({ meal, onDelete }: MealSectionProps) {
   const { targets } = useMeals();
   const { lang, t } = useLanguage();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const styles = React.useMemo(() => getStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(true);
 
-  const mealMeta = MEAL_TYPES.find((m) => m.key === meal.meal_type) ?? MEAL_TYPES[0];
+  const mealMeta = getMealMeta(isDark, meal.meal_type);
   const totalCal = meal.items.reduce((s, i) => s + (i.calculated_calories ?? 0), 0);
   const totalP = meal.items.reduce((s, i) => s + (i.calculated_protein ?? 0), 0);
   const totalC = meal.items.reduce((s, i) => s + (i.calculated_carbs ?? 0), 0);
@@ -144,15 +144,15 @@ export default function MealSection({ meal, onDelete }: MealSectionProps) {
   };
 
   return (
-    <View style={[styles.container, { borderLeftColor: mealMeta.color }]}>
+    <View style={[styles.container, { borderLeftColor: mealMeta.fg }]}>
       <AnimatedPressable
         style={styles.header}
         onPress={toggle}
         scaleTo={0.98}
       >
         <View style={styles.headerLeft}>
-          <Ionicons name={mealMeta.icon as any} size={18} color={mealMeta.color} />
-          <Text style={[styles.mealType, { color: mealMeta.color }]}>
+          <Ionicons name={mealMeta.icon as any} size={18} color={mealMeta.fg} />
+          <Text style={[styles.mealType, { color: mealMeta.fg }]}>
             {getMealTypeLabel(lang, mealMeta.key)}
           </Text>
           <Text style={styles.itemCount}>

@@ -120,7 +120,7 @@ function streamGeminiScan(
     );
   }
 
-  const model = process.env.EXPO_PUBLIC_GEMINI_VISION_MODEL || 'gemini-1.5-flash';
+  const model = process.env.EXPO_PUBLIC_GEMINI_VISION_MODEL || 'gemini-3.6-flash';
   // Use SSE streaming endpoint
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
 
