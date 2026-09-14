@@ -71,6 +71,9 @@ function TabItem({
   onLongPress,
   config,
   label,
+  activeColor,
+  inactiveColor,
+  pillColor,
 }: {
   route: any;
   isFocused: boolean;
@@ -78,6 +81,9 @@ function TabItem({
   onLongPress: () => void;
   config: TabConfig;
   label: string;
+  activeColor: string;
+  inactiveColor: string;
+  pillColor: string;
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -99,8 +105,7 @@ function TabItem({
     }).start();
   };
 
-  const activeColor = '#FFFFFF';
-  const inactiveColor = '#8E95A0';
+  const iconColor = isFocused ? activeColor : inactiveColor;
 
   return (
     <Pressable
@@ -117,18 +122,21 @@ function TabItem({
       accessibilityRole="button"
       accessibilityState={isFocused ? { selected: true } : {}}
       accessibilityLabel={label}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
     >
       <Animated.View style={[styles.tabContent, { transform: [{ scale: scaleAnim }] }]}>
-        <Ionicons
-          name={isFocused ? config.iconFocused : config.iconUnfocused}
-          size={22}
-          color={isFocused ? activeColor : inactiveColor}
-        />
+        <View style={[styles.iconPill, isFocused && { backgroundColor: pillColor }]}>
+          <Ionicons
+            name={isFocused ? config.iconFocused : config.iconUnfocused}
+            size={22}
+            color={iconColor}
+          />
+        </View>
         <Text
           numberOfLines={1}
           style={[
             styles.tabLabel,
-            { color: isFocused ? activeColor : inactiveColor, fontWeight: isFocused ? '700' : '500' },
+            { color: iconColor, fontWeight: isFocused ? '700' : '500' },
           ]}
         >
           {label}
@@ -141,9 +149,13 @@ function TabItem({
 function CenterActionButton({
   onPress,
   primaryColor,
+  barColor,
+  barBorderColor,
 }: {
   onPress: () => void;
   primaryColor: string;
+  barColor: string;
+  barBorderColor: string;
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -167,8 +179,13 @@ function CenterActionButton({
 
   return (
     <View style={styles.centerButtonWrapper} pointerEvents="box-none">
-      {/* Curved notch backdrop cradle */}
-      <View style={styles.notchCradle} />
+      {/* Curved notch backdrop cradle — color-matched to bar to hide seam */}
+      <View
+        style={[
+          styles.notchCradle,
+          { backgroundColor: barColor, borderColor: barBorderColor },
+        ]}
+      />
 
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <Pressable
@@ -180,7 +197,14 @@ function CenterActionButton({
           }}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          style={[styles.centerFab, { backgroundColor: primaryColor, shadowColor: primaryColor }]}
+          style={[
+            styles.centerFab,
+            {
+              backgroundColor: primaryColor,
+              shadowColor: primaryColor,
+              borderColor: barColor,
+            },
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Scan and log meal"
         >
@@ -197,8 +221,30 @@ export default function FloatingTabBar({
   navigation,
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useLanguage();
+
+  // ─── Themed navbar tokens (fits DESIGN.md warm system) ───
+  const barColor = colors.bgCard;
+  const barBorderColor = colors.border;
+  const activeColor = colors.primary;
+  const inactiveColor = colors.textSecondary;
+  const pillColor = colors.primaryGlow;
+  const barShadow = isDark
+    ? {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 18,
+        elevation: 12,
+      }
+    : {
+        shadowColor: '#2F3E46',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
+        elevation: 6,
+      };
 
   // Keyboard avoidance animation
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
@@ -254,7 +300,16 @@ export default function FloatingTabBar({
       ]}
       pointerEvents={isKeyboardVisible ? 'none' : 'box-none'}
     >
-      <View style={styles.pillBar}>
+      <View
+        style={[
+          styles.pillBar,
+          {
+            backgroundColor: barColor,
+            borderColor: barBorderColor,
+            ...barShadow,
+          },
+        ]}
+      >
         {/* Left tabs (Home, Search) */}
         <View style={styles.tabGroup}>
           {leftRoutes.map((route) => {
@@ -297,6 +352,9 @@ export default function FloatingTabBar({
                 onLongPress={onLongPress}
                 config={config}
                 label={label}
+                activeColor={activeColor}
+                inactiveColor={inactiveColor}
+                pillColor={pillColor}
               />
             );
           })}
@@ -347,6 +405,9 @@ export default function FloatingTabBar({
                 onLongPress={onLongPress}
                 config={config}
                 label={label}
+                activeColor={activeColor}
+                inactiveColor={inactiveColor}
+                pillColor={pillColor}
               />
             );
           })}
@@ -357,6 +418,8 @@ export default function FloatingTabBar({
       {centerRoute && (
         <CenterActionButton
           primaryColor={colors.primary}
+          barColor={barColor}
+          barBorderColor={barBorderColor}
           onPress={() => {
             const event = navigation.emit({
               type: 'tabPress',
@@ -388,17 +451,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     height: 66,
-    backgroundColor: '#16191D',
     borderRadius: 33,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    // Deep ambient floating shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    elevation: 12,
+    // backgroundColor / borderColor / shadow are themed inline
   },
   tabGroup: {
     flex: 2,
@@ -420,6 +476,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
   },
+  iconPill: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 3,
+    borderRadius: 999,
+    minWidth: 50,
+  },
   tabLabel: {
     fontSize: FontSize.xs || 11,
     letterSpacing: 0.1,
@@ -437,11 +501,9 @@ const styles = StyleSheet.create({
     width: 66,
     height: 66,
     borderRadius: 33,
-    backgroundColor: '#16191D',
     top: -3,
-    // Matching pill border
+    // backgroundColor / borderColor matched to bar inline to hide seam
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   centerFab: {
     width: 56,
@@ -449,8 +511,10 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    // borderColor = barColor inline (creates clean cutout ring)
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
+    shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 8,
   },

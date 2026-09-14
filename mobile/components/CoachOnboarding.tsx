@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -397,7 +398,12 @@ export default function CoachOnboarding() {
   const finishOnboarding = async () => {
     setSaving(true);
     coach.trigger('celebrate');
-    setShowConfetti(true);
+    setShowConfetti(false);
+    setTimeout(() => setShowConfetti(true), 50);
+
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
 
     const age = parseInt(form.age, 10) || 25;
     const heightCm = parseHeightToCm(form.heightValue, form.heightUnit);
@@ -436,10 +442,23 @@ export default function CoachOnboarding() {
 
     setTimeout(() => {
       router.replace('/(tabs)');
-    }, 1200);
+    }, 1600);
   };
 
   const currentStep = STEPS[step];
+
+  // Celebratory confetti shower upon arriving at the final finish step
+  useEffect(() => {
+    if (currentStep === 'finish') {
+      setShowConfetti(true);
+      coach.trigger('celebrate');
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } else {
+      setShowConfetti(false);
+    }
+  }, [currentStep, coach]);
 
   useEffect(() => {
     const onBack = () => {
