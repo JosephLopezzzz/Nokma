@@ -168,6 +168,10 @@ export const STRINGS = {
     'Nokma can support general tracking. For condition-specific food, calorie, medication, or activity advice, please follow guidance from your doctor or registered dietitian.',
     'Ang Nokma ay maaaring sumuporta sa general tracking. Para sa payo tungkol sa partikular na kondisyon — pagkain, calorie, gamot, o aktibidad — mangyaring sumunod sa gabay ng iyong doktor o rehistradong dietitian.',
   ],
+  'onboarding.healthModalTitle': ['Health Conditions', 'Mga Kondisyon sa Kalusugan'],
+  'onboarding.allergiesModalTitle': ['Allergies & Intolerances', 'Mga Allergy at Intolerance'],
+  'onboarding.selectApplicable': ['Select all that apply', 'Piliin ang lahat ng naaangkop'],
+  'onboarding.saveSelection': ['Save Selection', 'I-save ang Napili'],
   'onboarding.searchConditions': ['Search conditions...', 'Maghanap ng kondisyon...'],
 
   // Allergies

@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Modal,
   SafeAreaView,
+  StatusBar,
   Easing,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
@@ -216,6 +217,10 @@ export default function CoachOnboarding() {
   const { completeOnboarding } = useAuth();
   const { lang, setLang, t } = useLanguage();
   const insets = useSafeAreaInsets();
+  const modalTopInset = Platform.OS === 'android'
+    ? Math.max(insets.top, StatusBar.currentHeight ?? 0, 28)
+    : Math.max(insets.top, 16);
+  const modalBottomInset = Math.max(insets.bottom, 20);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -1182,34 +1187,78 @@ export default function CoachOnboarding() {
         presentationStyle="pageSheet"
         onRequestClose={() => setHealthModalOpen(false)}
       >
-        <SafeAreaView style={styles.modalRoot}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t('onboarding.searchConditions')}</Text>
-            <AnimatedPressable
-              onPress={() => setHealthModalOpen(false)}
-              style={styles.modalDoneBtn}
-              scaleTo={0.94}
-              hapticStyle="Light"
-            >
-              <Text style={styles.modalDoneText}>{t('common.done') || 'Done'}</Text>
-            </AnimatedPressable>
+        <View style={styles.modalRoot}>
+          {/* Safe Top Header */}
+          <View style={[styles.modalTopBar, { paddingTop: modalTopInset }]}>
+            <View style={styles.modalHandleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleWrap}>
+                <Text style={styles.modalTitle}>{t('onboarding.healthModalTitle') || 'Health Conditions'}</Text>
+                <Text style={styles.modalSubtitle}>
+                  {form.healthConditions.length > 0
+                    ? `${form.healthConditions.length} ${t('common.selected') || 'selected'}`
+                    : (t('onboarding.selectApplicable') || 'Select all that apply')}
+                </Text>
+              </View>
+              <AnimatedPressable
+                onPress={() => setHealthModalOpen(false)}
+                style={styles.modalDoneBtn}
+                scaleTo={0.94}
+                hapticStyle="Light"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="checkmark" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                <Text style={styles.modalDoneText}>{t('common.done') || 'Done'}</Text>
+              </AnimatedPressable>
+            </View>
           </View>
-          <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-            <SearchableSelectList
-              groups={healthGroups}
-              metaOptions={metaOptions}
-              selectedKeys={form.healthConditions}
-              onSelectionChange={(keys) => updateForm({ healthConditions: keys })}
-              otherKey="other"
-              otherValue={form.healthConditionOther}
-              onOtherChange={(text) => updateForm({ healthConditionOther: text })}
-              noneKey="none"
-              preferNotKey="prefer_not_say"
-              searchPlaceholder={t('onboarding.searchConditions')}
-              safetyMessage={getHealthConditionSafetyNotice(lang)}
-            />
-          </ScrollView>
-        </SafeAreaView>
+
+          {/* Scrollable Content */}
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={[styles.modalScrollContent, { paddingBottom: modalBottomInset + 80 }]}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator={true}
+            >
+              <SearchableSelectList
+                groups={healthGroups}
+                metaOptions={metaOptions}
+                selectedKeys={form.healthConditions}
+                onSelectionChange={(keys) => updateForm({ healthConditions: keys })}
+                otherKey="other"
+                otherValue={form.healthConditionOther}
+                onOtherChange={(text) => updateForm({ healthConditionOther: text })}
+                noneKey="none"
+                preferNotKey="prefer_not_say"
+                searchPlaceholder={t('onboarding.searchConditions')}
+                safetyMessage={getHealthConditionSafetyNotice(lang)}
+              />
+            </ScrollView>
+
+            {/* Sticky Bottom Confirmation Footer */}
+            <View style={[styles.modalFooter, { paddingBottom: modalBottomInset }]}>
+              <AnimatedPressable
+                onPress={() => setHealthModalOpen(false)}
+                style={styles.modalSaveBtn}
+                scaleTo={0.96}
+                hapticStyle="Medium"
+              >
+                <Text style={styles.modalSaveBtnText}>
+                  {form.healthConditions.length > 0
+                    ? `${t('onboarding.saveSelection') || 'Save Selection'} (${form.healthConditions.length})`
+                    : (t('common.done') || 'Done')}
+                </Text>
+              </AnimatedPressable>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Allergies & Intolerances Modal */}
@@ -1219,46 +1268,90 @@ export default function CoachOnboarding() {
         presentationStyle="pageSheet"
         onRequestClose={() => setAllergiesModalOpen(false)}
       >
-        <SafeAreaView style={styles.modalRoot}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t('onboarding.searchAllergens')}</Text>
-            <AnimatedPressable
-              onPress={() => setAllergiesModalOpen(false)}
-              style={styles.modalDoneBtn}
-              scaleTo={0.94}
-              hapticStyle="Light"
-            >
-              <Text style={styles.modalDoneText}>{t('common.done') || 'Done'}</Text>
-            </AnimatedPressable>
+        <View style={styles.modalRoot}>
+          {/* Safe Top Header */}
+          <View style={[styles.modalTopBar, { paddingTop: modalTopInset }]}>
+            <View style={styles.modalHandleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleWrap}>
+                <Text style={styles.modalTitle}>{t('onboarding.allergiesModalTitle') || 'Allergies & Intolerances'}</Text>
+                <Text style={styles.modalSubtitle}>
+                  {form.allergies.length > 0
+                    ? `${form.allergies.length} ${t('common.selected') || 'selected'}`
+                    : (t('onboarding.selectApplicable') || 'Select all that apply')}
+                </Text>
+              </View>
+              <AnimatedPressable
+                onPress={() => setAllergiesModalOpen(false)}
+                style={styles.modalDoneBtn}
+                scaleTo={0.94}
+                hapticStyle="Light"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="checkmark" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                <Text style={styles.modalDoneText}>{t('common.done') || 'Done'}</Text>
+              </AnimatedPressable>
+            </View>
           </View>
-          <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-            <SearchableSelectList
-              groups={allergenGroups}
-              metaOptions={metaOptions}
-              selectedKeys={form.allergies}
-              onSelectionChange={(keys) => updateForm({ allergies: keys })}
-              otherKey="other"
-              otherValue={form.allergyOther}
-              onOtherChange={(text) => updateForm({ allergyOther: text })}
-              noneKey="none"
-              preferNotKey="prefer_not_say"
-              searchPlaceholder={t('onboarding.searchAllergens')}
-              safetyMessage={getAllergySafetyNotice(lang)}
-            />
-            <View style={styles.sectionSpacer} />
-            <Text style={styles.sectionTitle}>{t('onboarding.intolerancesTitle')}</Text>
-            <Text style={styles.sectionHint}>{t('onboarding.intolerancesHint')}</Text>
-            <TextInput
-              style={styles.inputCard}
-              placeholder={t('onboarding.intolerancesPlaceholder')}
-              placeholderTextColor="#9CA3AF"
-              value={form.intolerances}
-              onChangeText={(v) => updateForm({ intolerances: v })}
-              multiline
-              numberOfLines={2}
-            />
-          </ScrollView>
-        </SafeAreaView>
+
+          {/* Scrollable Content */}
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={[styles.modalScrollContent, { paddingBottom: modalBottomInset + 80 }]}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator={true}
+            >
+              <SearchableSelectList
+                groups={allergenGroups}
+                metaOptions={metaOptions}
+                selectedKeys={form.allergies}
+                onSelectionChange={(keys) => updateForm({ allergies: keys })}
+                otherKey="other"
+                otherValue={form.allergyOther}
+                onOtherChange={(text) => updateForm({ allergyOther: text })}
+                noneKey="none"
+                preferNotKey="prefer_not_say"
+                searchPlaceholder={t('onboarding.searchAllergens')}
+                safetyMessage={getAllergySafetyNotice(lang)}
+              />
+              <View style={styles.sectionSpacer} />
+              <Text style={styles.sectionTitle}>{t('onboarding.intolerancesTitle')}</Text>
+              <Text style={styles.sectionHint}>{t('onboarding.intolerancesHint')}</Text>
+              <TextInput
+                style={[styles.inputCard, { marginTop: 6 }]}
+                placeholder={t('onboarding.intolerancesPlaceholder')}
+                placeholderTextColor="#9CA3AF"
+                value={form.intolerances}
+                onChangeText={(v) => updateForm({ intolerances: v })}
+                multiline
+                numberOfLines={2}
+              />
+            </ScrollView>
+
+            {/* Sticky Bottom Confirmation Footer */}
+            <View style={[styles.modalFooter, { paddingBottom: modalBottomInset }]}>
+              <AnimatedPressable
+                onPress={() => setAllergiesModalOpen(false)}
+                style={styles.modalSaveBtn}
+                scaleTo={0.96}
+                hapticStyle="Medium"
+              >
+                <Text style={styles.modalSaveBtnText}>
+                  {form.allergies.length > 0
+                    ? `${t('onboarding.saveSelection') || 'Save Selection'} (${form.allergies.length})`
+                    : (t('common.done') || 'Done')}
+                </Text>
+              </AnimatedPressable>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Celebratory confetti burst */}
@@ -2033,23 +2126,106 @@ const styles = StyleSheet.create({
   },
 
   // ── Modals ──
-  modalRoot: { flex: 1, backgroundColor: '#FFFFFF' },
+  modalRoot: {
+    flex: 1,
+    backgroundColor: '#FAF6EE',
+  },
+  modalTopBar: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0E5D8',
+    shadowColor: '#4A2810',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 2,
+    zIndex: 10,
+  },
+  modalHandleWrap: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  modalHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#D1D5DB',
+  },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEDECB',
+    paddingTop: 4,
+    paddingBottom: Spacing.md,
   },
-  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: '#1F2937' },
+  modalTitleWrap: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: '#1F2937',
+  },
+  modalSubtitle: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    fontWeight: FontWeight.medium,
+  },
   modalDoneBtn: {
     backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  modalDoneText: { color: '#FFFFFF', fontWeight: FontWeight.bold, fontSize: FontSize.sm },
-  modalScroll: { flex: 1, padding: Spacing.lg },
+  modalDoneText: {
+    color: '#FFFFFF',
+    fontWeight: FontWeight.bold,
+    fontSize: FontSize.sm,
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    padding: Spacing.lg,
+  },
+  modalFooter: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F0E5D8',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: 12,
+    shadowColor: '#4A2810',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  modalSaveBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  modalSaveBtnText: {
+    color: '#FFFFFF',
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+  },
 });

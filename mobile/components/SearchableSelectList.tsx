@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import type { SelectItem, SelectGroup } from '../services/coachMessageService';
 import { useLanguage } from '../context/LanguageContext';
 import { Colors, FontSize, FontWeight, Spacing, Radius } from '../constants/theme';
+import AnimatedPressable from './AnimatedPressable';
 
 interface SearchableSelectListProps {
   groups: SelectGroup[];
@@ -49,16 +51,7 @@ export default function SearchableSelectList({
 }: SearchableSelectListProps) {
   const { t } = useLanguage();
   const [search, setSearch] = useState('');
-
-  const allItems = useMemo(() => {
-    const items: { key: string; label: string }[] = [];
-    for (const g of groups) {
-      for (const item of g.items) {
-        items.push(item);
-      }
-    }
-    return items;
-  }, [groups]);
+  const [isFocused, setIsFocused] = useState(false);
 
   const filteredGroups = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -77,86 +70,128 @@ export default function SearchableSelectList({
     return metaOptions.some((m) => m.label.toLowerCase().includes(q));
   }, [search, metaOptions]);
 
-  const showSafety = selectedKeys.length > 0 &&
+  const showSafety =
+    selectedKeys.length > 0 &&
     !selectedKeys.includes(noneKey) &&
     !selectedKeys.includes(preferNotKey);
 
-  const anyChecked = selectedKeys.length > 0;
-
   return (
     <View style={styles.container}>
-      <TextInput
-        style={styles.searchInput}
-        placeholder={searchPlaceholder}
-        placeholderTextColor={Colors.textMuted}
-        value={search}
-        onChangeText={setSearch}
-        autoCapitalize="none"
-        autoCorrect={false}
-        accessibilityLabel={searchPlaceholder}
-      />
+      {/* Interactive Search Input */}
+      <View style={[styles.searchBarContainer, isFocused && styles.searchBarContainerFocused]}>
+        <Ionicons name="search-outline" size={20} color={isFocused ? Colors.primary : '#8FA4AE'} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={searchPlaceholder}
+          placeholderTextColor="#9CA3AF"
+          value={search}
+          onChangeText={setSearch}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          accessibilityLabel={searchPlaceholder}
+        />
+        {search.length > 0 && (
+          <Pressable
+            onPress={() => setSearch('')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.clearBtn}
+            accessibilityLabel="Clear search"
+          >
+            <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+          </Pressable>
+        )}
+      </View>
 
-      {filteredGroups.map((group) => (
-        <View key={group.category} style={styles.group}>
-          <Text style={styles.categoryLabel}>{group.category}</Text>
-          {group.items.map((item) => {
-            const sel = selectedKeys.includes(item.key);
-            return (
-              <Pressable
-                key={item.key}
-                style={[styles.row, sel && styles.rowActive]}
-                onPress={() => onSelectionChange(toggleKey(selectedKeys, item.key, noneKey, preferNotKey))}
-                accessibilityLabel={`${item.label}, ${sel ? t('common.selected') : t('common.notSelected')}`}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: sel }}
-              >
-                <View style={[styles.checkbox, sel && styles.checkboxActive]}>
-                  {sel && <Text style={styles.checkMark}>✓</Text>}
+      {/* Filtered Condition/Allergen Groups */}
+      {filteredGroups.map((group) => {
+        const selectedInGroupCount = group.items.filter((item) => selectedKeys.includes(item.key)).length;
+
+        return (
+          <View key={group.category} style={styles.group}>
+            <View style={styles.categoryHeader}>
+              <Text style={styles.categoryLabel}>{group.category}</Text>
+              {selectedInGroupCount > 0 && (
+                <View style={styles.groupBadge}>
+                  <Text style={styles.groupBadgeText}>{selectedInGroupCount}</Text>
                 </View>
-                <Text style={[styles.rowText, sel && styles.rowTextActive]}>{item.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ))}
+              )}
+            </View>
 
+            {group.items.map((item) => {
+              const sel = selectedKeys.includes(item.key);
+              return (
+                <AnimatedPressable
+                  key={item.key}
+                  style={[styles.row, sel && styles.rowActive]}
+                  onPress={() => onSelectionChange(toggleKey(selectedKeys, item.key, noneKey, preferNotKey))}
+                  scaleTo={0.98}
+                  hapticStyle="selection"
+                  accessibilityLabel={`${item.label}, ${sel ? t('common.selected') : t('common.notSelected')}`}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: sel }}
+                >
+                  <View style={[styles.checkbox, sel && styles.checkboxActive]}>
+                    {sel && <Ionicons name="checkmark-sharp" size={14} color="#FFFFFF" />}
+                  </View>
+                  <Text style={[styles.rowText, sel && styles.rowTextActive]}>{item.label}</Text>
+                </AnimatedPressable>
+              );
+            })}
+          </View>
+        );
+      })}
+
+      {/* Meta Options (None, Other, Prefer not to say) */}
       {metaMatches && (
         <View style={styles.group}>
-          <Text style={styles.categoryLabel}>{t('common.options')}</Text>
+          <View style={styles.categoryHeader}>
+            <Text style={styles.categoryLabel}>{t('common.options') || 'OPTIONS'}</Text>
+          </View>
           {metaOptions.map((opt) => {
             const sel = selectedKeys.includes(opt.key);
             return (
-              <Pressable
+              <AnimatedPressable
                 key={opt.key}
                 style={[styles.row, sel && styles.rowActive]}
                 onPress={() => onSelectionChange(toggleKey(selectedKeys, opt.key, noneKey, preferNotKey))}
+                scaleTo={0.98}
+                hapticStyle="selection"
                 accessibilityLabel={`${opt.label}, ${sel ? t('common.selected') : t('common.notSelected')}`}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: sel }}
               >
                 <View style={[styles.checkbox, sel && styles.checkboxActive]}>
-                  {sel && <Text style={styles.checkMark}>✓</Text>}
+                  {sel && <Ionicons name="checkmark-sharp" size={14} color="#FFFFFF" />}
                 </View>
                 <Text style={[styles.rowText, sel && styles.rowTextActive]}>{opt.label}</Text>
-              </Pressable>
+              </AnimatedPressable>
             );
           })}
         </View>
       )}
 
+      {/* "Other" Specify Input */}
       {selectedKeys.includes(otherKey) && (
-        <TextInput
-          style={styles.otherInput}
-          placeholder={t('common.pleaseSpecify')}
-          placeholderTextColor={Colors.textMuted}
-          value={otherValue}
-          onChangeText={onOtherChange}
-          accessibilityLabel={`${t('common.other')}, ${t('common.pleaseSpecify')}`}
-        />
+        <View style={styles.otherInputWrapper}>
+          <Text style={styles.otherInputLabel}>{t('common.pleaseSpecify') || 'Please specify:'}</Text>
+          <TextInput
+            style={styles.otherInput}
+            placeholder={t('common.pleaseSpecify') || 'Enter specifics here...'}
+            placeholderTextColor="#9CA3AF"
+            value={otherValue}
+            onChangeText={onOtherChange}
+            accessibilityLabel={`${t('common.other')}, ${t('common.pleaseSpecify')}`}
+          />
+        </View>
       )}
 
+      {/* Medical / Safety Disclaimer Box */}
       {showSafety && (
         <View style={styles.safetyBox}>
+          <Ionicons name="shield-checkmark-outline" size={20} color="#B45309" style={styles.safetyIcon} />
           <Text style={styles.safetyText}>{safetyMessage}</Text>
         </View>
       )}
@@ -165,70 +200,152 @@ export default function SearchableSelectList({
 }
 
 const styles = StyleSheet.create({
-  container: { gap: Spacing.sm },
+  container: {
+    gap: Spacing.sm,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#EEDECB',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 6,
+    gap: 10,
+    shadowColor: '#4A2810',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    marginBottom: 4,
+  },
+  searchBarContainerFocused: {
+    borderColor: Colors.primary,
+    backgroundColor: '#FFFFFF',
+    shadowOpacity: 0.08,
+  },
   searchInput: {
-    backgroundColor: Colors.bgCard,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+    flex: 1,
     fontSize: FontSize.md,
     color: Colors.textPrimary,
+    paddingVertical: Platform.OS === 'android' ? 6 : 0,
   },
-  group: { gap: 2 },
+  clearBtn: {
+    padding: 4,
+  },
+  group: {
+    marginTop: 6,
+    gap: 3,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginTop: 8,
+    marginBottom: 4,
+  },
   categoryLabel: {
     fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-    color: Colors.textSecondary,
+    fontWeight: FontWeight.extrabold,
+    color: '#6B7280',
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginTop: Spacing.sm,
-    marginBottom: 4,
-    paddingHorizontal: 2,
+    letterSpacing: 0.8,
+  },
+  groupBadge: {
+    backgroundColor: Colors.primaryGlow,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#F5C6B1',
+  },
+  groupBadgeText: {
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    color: Colors.primary,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: Radius.sm,
+    minHeight: 48,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'transparent',
     gap: 12,
+    backgroundColor: 'transparent',
   },
-  rowActive: { backgroundColor: Colors.primaryGlow },
+  rowActive: {
+    backgroundColor: '#FFF4EE',
+    borderColor: '#F5C6B1',
+  },
   checkbox: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: Colors.border,
+    borderColor: '#D7C7B7',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkboxActive: { borderColor: Colors.primary, backgroundColor: Colors.primary },
-  checkMark: { color: Colors.textInverse, fontSize: 14, fontWeight: FontWeight.bold },
-  rowText: { fontSize: FontSize.sm, color: Colors.textPrimary, flex: 1 },
-  rowTextActive: { color: Colors.primary, fontWeight: FontWeight.semibold },
-  otherInput: {
-    backgroundColor: Colors.bgCard,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    fontSize: FontSize.md,
-    color: Colors.textPrimary,
-    marginTop: Spacing.sm,
+  checkboxActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary,
   },
-  safetyBox: {
-    backgroundColor: '#FFF8E1',
-    borderWidth: 1,
-    borderColor: '#F0D78A',
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginTop: Spacing.sm,
-  },
-  safetyText: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
+  rowText: {
+    fontSize: FontSize.sm + 0.5,
+    color: '#374151',
+    flex: 1,
     lineHeight: 20,
   },
+  rowTextActive: {
+    color: Colors.primary,
+    fontWeight: FontWeight.bold,
+  },
+  otherInputWrapper: {
+    marginTop: 8,
+    gap: 6,
+  },
+  otherInputLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: Colors.textSecondary,
+    paddingHorizontal: 4,
+  },
+  otherInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#EEDECB',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: FontSize.md,
+    color: Colors.textPrimary,
+  },
+  safetyBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 14,
+    gap: 10,
+  },
+  safetyIcon: {
+    marginTop: 1,
+  },
+  safetyText: {
+    flex: 1,
+    fontSize: FontSize.xs + 0.5,
+    color: '#78350F',
+    lineHeight: 18,
+    fontWeight: FontWeight.medium,
+  },
 });
+
