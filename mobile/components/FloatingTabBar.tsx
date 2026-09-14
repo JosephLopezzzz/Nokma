@@ -73,7 +73,6 @@ function TabItem({
   label,
   activeColor,
   inactiveColor,
-  pillColor,
 }: {
   route: any;
   isFocused: boolean;
@@ -83,13 +82,23 @@ function TabItem({
   label: string;
   activeColor: string;
   inactiveColor: string;
-  pillColor: string;
+  pillColor?: string;
 }) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const pressScaleAnim = useRef(new Animated.Value(1)).current;
+  const activeAnim = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(activeAnim, {
+      toValue: isFocused ? 1 : 0,
+      friction: 7,
+      tension: 90,
+      useNativeDriver: true,
+    }).start();
+  }, [isFocused, activeAnim]);
 
   const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.9,
+    Animated.spring(pressScaleAnim, {
+      toValue: 0.92,
       useNativeDriver: true,
       speed: 50,
       bounciness: 8,
@@ -97,13 +106,28 @@ function TabItem({
   };
 
   const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
+    Animated.spring(pressScaleAnim, {
       toValue: 1,
       useNativeDriver: true,
       speed: 50,
       bounciness: 8,
     }).start();
   };
+
+  const iconScale = activeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.12],
+  });
+
+  const iconTranslateY = activeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, -1],
+  });
+
+  const indicatorScaleX = activeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.2, 1],
+  });
 
   const iconColor = isFocused ? activeColor : inactiveColor;
 
@@ -124,23 +148,43 @@ function TabItem({
       accessibilityLabel={label}
       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
     >
-      <Animated.View style={[styles.tabContent, { transform: [{ scale: scaleAnim }] }]}>
-        <View style={[styles.iconPill, isFocused && { backgroundColor: pillColor }]}>
+      <Animated.View style={[styles.tabContent, { transform: [{ scale: pressScaleAnim }] }]}>
+        <Animated.View
+          style={[
+            styles.iconWrap,
+            {
+              transform: [{ scale: iconScale }, { translateY: iconTranslateY }],
+            },
+          ]}
+        >
           <Ionicons
             name={isFocused ? config.iconFocused : config.iconUnfocused}
-            size={22}
+            size={23}
             color={iconColor}
           />
-        </View>
+        </Animated.View>
         <Text
           numberOfLines={1}
           style={[
             styles.tabLabel,
-            { color: iconColor, fontWeight: isFocused ? '700' : '500' },
+            {
+              color: iconColor,
+              fontWeight: isFocused ? '700' : '500',
+            },
           ]}
         >
           {label}
         </Text>
+        <Animated.View
+          style={[
+            styles.activeIndicator,
+            {
+              backgroundColor: activeColor,
+              opacity: activeAnim,
+              transform: [{ scaleX: indicatorScaleX }],
+            },
+          ]}
+        />
       </Animated.View>
     </Pressable>
   );
@@ -469,24 +513,28 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   tabContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
   },
-  iconPill: {
+  iconWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 3,
-    borderRadius: 999,
-    minWidth: 50,
+    width: 28,
+    height: 28,
+    marginBottom: 2,
   },
   tabLabel: {
     fontSize: FontSize.xs || 11,
     letterSpacing: 0.1,
+  },
+  activeIndicator: {
+    width: 14,
+    height: 3,
+    borderRadius: 1.5,
+    marginTop: 2,
   },
   centerButtonWrapper: {
     position: 'absolute',
