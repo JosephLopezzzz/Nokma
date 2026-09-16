@@ -87,7 +87,7 @@ export default function TabLayout() {
           listeners={{
             tabPress: (e) => {
               e.preventDefault();
-              router.push({ pathname: '/log', params: { openScanner: 'true' } });
+              router.push({ pathname: '/(tabs)/log', params: { openScanner: 'true' } });
             },
           }}
         />

@@ -197,6 +197,20 @@ export default function ChatScreen() {
   const { colors } = useTheme();
   const styles = React.useMemo(() => getStyles(colors), [colors]);
 
+  // Guarded dismiss: avoids "GO_BACK was not handled" when there is no history
+  // (deep link, reload, or double-tap on close/backdrop).
+  const handleClose = useCallback(() => {
+    try {
+      if (router.canGoBack()) {
+        router.dismiss();
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch {
+      router.replace('/(tabs)');
+    }
+  }, []);
+
   const [messages, setMessages] = useState<Message[]>(() => [
     {
       id: 'welcome',
@@ -1006,7 +1020,7 @@ export default function ChatScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={() => router.back()} />
+      <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
       <View style={[styles.chatContainer, { paddingBottom: insets.bottom }]}>
         {/* Simple Header View */}
         <View style={styles.header}>
@@ -1017,7 +1031,7 @@ export default function ChatScreen() {
               <Text style={styles.statusText}>{t(mascotStatusKey)}</Text>
             </View>
           </View>
-          <AnimatedPressable onPress={() => router.back()} style={styles.closeBtn} scaleTo={0.9}>
+          <AnimatedPressable onPress={handleClose} style={styles.closeBtn} scaleTo={0.9}>
             <Ionicons name="close-circle" size={32} color={colors.border} />
           </AnimatedPressable>
         </View>

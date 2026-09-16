@@ -602,56 +602,64 @@ function StreakHeroCard({
 
         {/* Calendar rows */}
         {weeks.map((week, wIdx) => {
-          // Detect streak run within this week for pill rendering
-          const runStart = week.findIndex(c => c && c.quality >= 1);
-          const runEnd   = week.reduce((last, c, i) => (c && c.quality >= 1 ? i : last), -1);
-          const hasRun   = runStart !== -1 && runEnd >= runStart;
+          // Per-cell streak membership for inline pill rendering
+          const inRun = week.map((c) => {
+            if (!c) return false;
+            const f = c.date > todayStr;
+            return !f && c.quality >= 1;
+          });
 
           return (
             <View key={wIdx} style={styles.streakWeekRow}>
-              {/* Streak pill highlight behind cells */}
-              {hasRun && (
-                <View
-                  style={[
-                    styles.streakPill,
-                    {
-                      left:  runStart * (36 + 4),
-                      right: (6 - runEnd) * (36 + 4),
-                      backgroundColor: '#D94A1E26',
-                    },
-                  ]}
-                />
-              )}
               {week.map((cell, cIdx) => {
                 if (!cell) return <View key={cIdx} style={styles.streakDayEmpty} />;
                 const isToday = cell.date === todayStr;
                 const isFuture = cell.date > todayStr;
                 const dotColor = getQualityColor(cell.quality);
                 const dayNum = parseInt(cell.date.split('-')[2], 10);
+
+                // Streak connector: determine rounded edges at run boundaries
+                const cellInRun = inRun[cIdx];
+                const prevInRun = cIdx > 0 && inRun[cIdx - 1];
+                const nextInRun = cIdx < 6 && inRun[cIdx + 1];
+                const isRunStart = cellInRun && !prevInRun;
+                const isRunEnd   = cellInRun && !nextInRun;
+
                 return (
-                  <View
-                    key={cell.date}
-                    style={[
-                      styles.streakDayCell,
-                      isToday && { borderWidth: 2, borderColor: colors.primary },
-                    ]}
-                  >
-                    {!isFuture && cell.quality > 0 ? (
-                      <View style={[styles.streakDayFill, { backgroundColor: dotColor }]}>
-                        <Text style={styles.streakDayNumFilled}>{dayNum}</Text>
-                        {cell.quality >= 2 && (
-                          <Text style={styles.streakDayEmoji}>
-                            {cell.quality === 3 ? '🔥' : '🟠'}
-                          </Text>
-                        )}
-                      </View>
-                    ) : (
-                      <Text style={[
-                        styles.streakDayNumEmpty,
-                        isFuture && { color: colors.textMuted },
-                        isToday && { color: colors.primary, fontWeight: FontWeight.bold },
-                      ]}>{dayNum}</Text>
+                  <View key={cell.date} style={styles.streakDayCellOuter}>
+                    {/* Per-cell streak connector background */}
+                    {cellInRun && (
+                      <View
+                        style={[
+                          styles.streakCellBg,
+                          isRunStart && { borderTopLeftRadius: 18, borderBottomLeftRadius: 18 },
+                          isRunEnd && { borderTopRightRadius: 18, borderBottomRightRadius: 18 },
+                        ]}
+                      />
                     )}
+                    <View
+                      style={[
+                        styles.streakDayCell,
+                        isToday && { borderWidth: 2, borderColor: colors.primary },
+                      ]}
+                    >
+                      {!isFuture && cell.quality > 0 ? (
+                        <View style={[styles.streakDayFill, { backgroundColor: dotColor }]}>
+                          <Text style={styles.streakDayNumFilled}>{dayNum}</Text>
+                          {cell.quality >= 2 && (
+                            <Text style={styles.streakDayEmoji}>
+                              {cell.quality === 3 ? '🔥' : '🟠'}
+                            </Text>
+                          )}
+                        </View>
+                      ) : (
+                        <Text style={[
+                          styles.streakDayNumEmpty,
+                          isFuture && { color: colors.textMuted },
+                          isToday && { color: colors.primary, fontWeight: FontWeight.bold },
+                        ]}>{dayNum}</Text>
+                      )}
+                    </View>
                   </View>
                 );
               })}
@@ -1040,18 +1048,26 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   streakWeekRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    position: 'relative',
     marginVertical: 2,
   },
-  streakPill: {
+  streakDayCellOuter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 40,
+  },
+  streakCellBg: {
     position: 'absolute',
     top: 2,
     bottom: 2,
-    borderRadius: 20,
+    left: 0,
+    right: 0,
+    backgroundColor: '#D94A1E16',
+    borderRadius: 0,
   },
   streakDayEmpty: {
-    width: 36,
-    height: 36,
+    flex: 1,
+    height: 40,
   },
   streakDayCell: {
     width: 36,

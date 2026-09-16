@@ -1,6 +1,6 @@
 import { Stack, router } from 'expo-router';
 import { useEffect } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform, BackHandler } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { MealProvider } from '../context/MealContext';
@@ -38,6 +38,20 @@ function RootLayoutNav() {
       router.replace('/(onboarding)');
     }
   }, [isOnboarded, isLoading]);
+
+  // Swallow hardware back at root when there is no history.
+  // Prevents "GO_BACK was not handled by any navigator" warning after
+  // router.replace() leaves a single-route stack. Nested handlers
+  // (e.g. onboarding steps, modal dismiss) run first; we only act
+  // when nothing else can go back.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (router.canGoBack()) return false;
+      if (Platform.OS === 'android') BackHandler.exitApp();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
 
   return (
     <>
