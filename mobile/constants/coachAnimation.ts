@@ -115,7 +115,7 @@ export type MascotAssetKey =
 // All mapped directly to verified existing local files.
 // Note: worry.png is Coach Hoo holding a phone with wing on chin (thinking/checklist pose).
 export const MASCOT_ASSETS: Record<MascotAssetKey, ImageSourcePropType> = {
-  idle: require('../assets/mascot/idle.png'),
+  idle: require('../assets/mascot/idle_static.png'),
   flex: require('../assets/mascot/flex.png'),
   streak: require('../assets/mascot/streak.png'),
   worry: require('../assets/mascot/worry.png'),

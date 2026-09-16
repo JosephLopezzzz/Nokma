@@ -19,8 +19,10 @@ yarn-error.*
 *.pem
 .env*.local
 *.tsbuildinfo
-/ios
-/android
+android/
+ios/
+mobile/android/
+mobile/ios/
 .env
 .agents/
 .claude/

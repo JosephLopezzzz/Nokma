@@ -1,3 +1,7 @@
 .agents/
 .claude/
 .gemini/
+mobile/android/
+mobile/ios/
+android/
+ios/
