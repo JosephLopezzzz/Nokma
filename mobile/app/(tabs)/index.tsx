@@ -216,7 +216,7 @@ export default function DashboardScreen() {
           {/* Header */}
           <View style={[styles.headerWrapper, { paddingTop: insets.top + Spacing.lg }]}>
             <View style={styles.header}>
-              <Text style={styles.nokmaTitle}>NOKMA</Text>
+              <Text style={[styles.nokmaTitle, isDark && { color: '#FFFFFF' }]}>NOKMA</Text>
             </View>
 
             <View ref={coachRef}>
