@@ -1,5 +1,5 @@
 import { Stack, router } from 'expo-router';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, Platform, BackHandler } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../context/AuthContext';
@@ -11,11 +11,14 @@ import { Colors as DefaultColors, ThemeColors } from '../constants/theme';
 import { initDb } from '../services/db';
 import NetInfo from '@react-native-community/netinfo';
 import { processSyncQueue } from '../services/syncService';
+import MascotIntro from '../components/MascotIntro';
 
 function RootLayoutNav() {
   const { isOnboarded, isLoading } = useAuth();
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors);
+  const [introVisible, setIntroVisible] = useState(true);
+  const completeIntro = useCallback(() => setIntroVisible(false), []);
 
   useEffect(() => {
     initDb(); // Initialize SQLite DB and handle migration
@@ -58,11 +61,19 @@ function RootLayoutNav() {
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.bg} />
       <View style={styles.webGutter}>
         <View style={styles.appContainer}>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-            <Stack.Screen name="(onboarding)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="chat-modal" options={{ presentation: 'transparentModal', animation: 'fade' }} />
-          </Stack>
+          <View
+            style={styles.navigation}
+            pointerEvents={introVisible ? 'none' : 'auto'}
+            accessibilityElementsHidden={introVisible}
+            importantForAccessibility={introVisible ? 'no-hide-descendants' : 'auto'}
+          >
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+              <Stack.Screen name="(onboarding)" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="chat-modal" options={{ presentation: 'transparentModal', animation: 'fade' }} />
+            </Stack>
+          </View>
+          {introVisible && <MascotIntro ready={!isLoading} onComplete={completeIntro} />}
         </View>
       </View>
     </>
@@ -86,6 +97,9 @@ export default function RootLayout() {
 }
 
 const getStyles = (colors: ThemeColors) => StyleSheet.create({
+  navigation: {
+    flex: 1,
+  },
   webGutter: {
     flex: 1,
     backgroundColor: Platform.OS === 'web' ? (colors.bg === '#121212' ? '#000000' : '#EBECEE') : colors.bg,
