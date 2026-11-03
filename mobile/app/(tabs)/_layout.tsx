@@ -1,19 +1,21 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Tabs, router } from 'expo-router';
-import { View, Image, StyleSheet, Animated, PanResponder, Dimensions } from 'react-native';
+import { View, StyleSheet, Animated, PanResponder, Dimensions, Pressable } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
-import AnimatedPressable from '../../components/AnimatedPressable';
 import FloatingTabBar from '../../components/FloatingTabBar';
 
 export default function TabLayout() {
   const { t } = useLanguage();
   const { colors } = useTheme();
+  const [chatheadHovered, setChatheadHovered] = useState(false);
+  const [chatheadPressed, setChatheadPressed] = useState(false);
 
   const pan = useRef(new Animated.ValueXY()).current;
   const screenWidth = Dimensions.get('window').width;
   const screenHeight = Dimensions.get('window').height;
-  const BUTTON_SIZE = 60;
+  const BUTTON_SIZE = 64;
   const MARGIN = 16;
   const MAX_Y = screenHeight - 160; // approximate boundary above floating tabs
   const MIN_Y = 50; // approximate boundary below header
@@ -102,20 +104,31 @@ export default function TabLayout() {
       </Tabs>
       
       <Animated.View 
-        style={[styles.floatingButton, { transform: pan.getTranslateTransform() }]} 
+        style={[styles.floatingButton, { borderColor: colors.primary, transform: pan.getTranslateTransform() }]}
         {...panResponder.panHandlers}
       >
-        <AnimatedPressable 
-          style={{ width: '100%', height: '100%' }}
+        <Pressable
+          style={[
+            styles.floatingButtonPressable,
+            (chatheadHovered || chatheadPressed) && { backgroundColor: '#F5EBE0' },
+          ]}
           onPress={() => router.push('/chat-modal')}
-          scaleTo={0.9}
+          onHoverIn={() => setChatheadHovered(true)}
+          onHoverOut={() => setChatheadHovered(false)}
+          onFocus={() => setChatheadHovered(true)}
+          onBlur={() => setChatheadHovered(false)}
+          onPressIn={() => setChatheadPressed(true)}
+          onPressOut={() => setChatheadPressed(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Ask Coach Hoo"
+          accessibilityHint="Opens the coaching chat."
         >
-          <Image 
-            source={require('../../assets/mascot/chatbot update.png')} 
-            style={styles.floatingImage} 
-            resizeMode="cover" 
+          <ExpoImage
+            source={require('../../assets/mascot/chatbot-dashboard.png')}
+            style={styles.floatingImage}
+            contentFit="contain"
           />
-        </AnimatedPressable>
+        </Pressable>
       </Animated.View>
     </View>
   );
@@ -126,19 +139,34 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: '45%', 
     right: 16,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    overflow: 'hidden',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    padding: 2,
+    backgroundColor: '#FAF6EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
     zIndex: 100,
-    shadowColor: '#000',
+    shadowColor: '#2F3E46',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 6,
-    elevation: 5,
+    elevation: 6,
   },
-  floatingImage: {
+  floatingButtonPressable: {
+    flex: 1,
     width: '100%',
     height: '100%',
+    borderRadius: 28,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FAF6EE',
+  },
+  floatingImage: {
+    width: '95%',
+    height: '95%',
   }
 });

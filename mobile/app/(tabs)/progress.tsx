@@ -14,10 +14,10 @@ import MealSection from '../../components/MealSection';
 import AnimatedPressable from '../../components/AnimatedPressable';
 import { useStreak } from '../../hooks/useStreak';
 import {
-  getQualityColor, getLevelGradient, getLevelEmoji,
+  getLevelGradient, getLevelEmoji,
   STREAK_MILESTONES, getNextMilestone,
 } from '../../services/streakService';
-import type { StreakDayEntry } from '../../types';
+import type { StreakDayEntry, StreakInfo } from '../../types';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -32,11 +32,6 @@ export default function ProgressScreen() {
   const [activeTab, setActiveTab] = useState<'diary' | 'charts'>('diary');
   const { streakInfo, isLoading: streakLoading } = useStreak(totals.calories, targets, totals);
 
-  // ── Calendar navigation ───────────────────────────────────────────────────
-  const today = new Date();
-  const [calYear,  setCalYear]  = useState(today.getFullYear());
-  const [calMonth, setCalMonth] = useState(today.getMonth()); // 0-indexed
-
   const [timeframe, setTimeframe] = useState<Timeframe>(7);
   const [loading, setLoading] = useState(true);
   const [historyData, setHistoryData] = useState<{
@@ -50,33 +45,21 @@ export default function ProgressScreen() {
 
   const targetCalories = targets?.calories_target || 2000;
 
-  // ── Streak calendar grid builder ──────────────────────────────────────────
-  const calendarGrid = useMemo(() => {
-    // Build a lookup from calendarData
-    const qualityMap: Record<string, StreakDayEntry> = {};
-    for (const entry of streakInfo.calendarData) {
-      qualityMap[entry.date] = entry;
+  // Arrange the existing 90-day streak data into Sunday-first contribution columns.
+  const calendarWeeks = useMemo<(StreakDayEntry | null)[][]>(() => {
+    if (!streakInfo.calendarData.length) return [];
+
+    const firstDate = new Date(`${streakInfo.calendarData[0].date}T00:00:00`);
+    const cells: (StreakDayEntry | null)[] = Array(firstDate.getDay()).fill(null);
+    cells.push(...streakInfo.calendarData);
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    const weeks: (StreakDayEntry | null)[][] = [];
+    for (let index = 0; index < cells.length; index += 7) {
+      weeks.push(cells.slice(index, index + 7));
     }
-
-    // First day of the displayed month
-    const firstDay = new Date(calYear, calMonth, 1);
-    const startDow = firstDay.getDay(); // 0=Sun
-    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-
-    // Pad with nulls before the 1st
-    const cells: (StreakDayEntry | null)[] = Array(startDow).fill(null);
-    for (let d = 1; d <= daysInMonth; d++) {
-      const mm = String(calMonth + 1).padStart(2, '0');
-      const dd = String(d).padStart(2, '0');
-      const dateStr = `${calYear}-${mm}-${dd}`;
-      cells.push(qualityMap[dateStr] ?? { date: dateStr, quality: 0, calories: 0 });
-    }
-    return cells;
-  }, [streakInfo.calendarData, calYear, calMonth]);
-
-  const calMonthLabel = new Date(calYear, calMonth, 1).toLocaleDateString('en-PH', {
-    month: 'long', year: 'numeric',
-  });
+    return weeks;
+  }, [streakInfo.calendarData]);
 
   const loadHistory = useCallback(async (days: Timeframe) => {
     setLoading(true);
@@ -358,22 +341,7 @@ export default function ProgressScreen() {
         {/* ── Streak Hero Card ─────────────────────────────────────────────── */}
         <StreakHeroCard
           streakInfo={streakInfo}
-          calendarGrid={calendarGrid}
-          calMonthLabel={calMonthLabel}
-          calYear={calYear}
-          calMonth={calMonth}
-          onPrevMonth={() => {
-            if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
-            else setCalMonth(m => m - 1);
-          }}
-          onNextMonth={() => {
-            const now = new Date();
-            const isCurrentMonth = calYear === now.getFullYear() && calMonth === now.getMonth();
-            if (!isCurrentMonth) {
-              if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
-              else setCalMonth(m => m + 1);
-            }
-          }}
+          calendarWeeks={calendarWeeks}
           colors={colors}
           styles={styles}
         />
@@ -490,25 +458,16 @@ export default function ProgressScreen() {
 // ─── StreakHeroCard ───────────────────────────────────────────────────────────
 
 const DAY_HEADERS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const DAY_QUALITY_LABELS = ['No meal', 'Logged', 'Close to goal', 'On target'] as const;
 
 function StreakHeroCard({
   streakInfo,
-  calendarGrid,
-  calMonthLabel,
-  calYear,
-  calMonth,
-  onPrevMonth,
-  onNextMonth,
+  calendarWeeks,
   colors,
   styles,
 }: {
-  streakInfo: any;
-  calendarGrid: any[];
-  calMonthLabel: string;
-  calYear: number;
-  calMonth: number;
-  onPrevMonth: () => void;
-  onNextMonth: () => void;
+  streakInfo: StreakInfo;
+  calendarWeeks: (StreakDayEntry | null)[][];
   colors: ThemeColors;
   styles: any;
 }) {
@@ -527,8 +486,38 @@ function StreakHeroCard({
   }, []);
 
   const now = new Date();
-  const isCurrentMonth = calYear === now.getFullYear() && calMonth === now.getMonth();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const todayEntry = streakInfo.calendarData.find((entry) => entry.date === todayStr);
+  const todayStatus = todayEntry && todayEntry.quality > 0
+    ? DAY_QUALITY_LABELS[todayEntry.quality]
+    : 'No meal yet';
+  const monthLabels = useMemo(() => {
+    let previousMonth = '';
+    return calendarWeeks.map((week) => {
+      const firstEntry = week.find((entry): entry is StreakDayEntry => entry !== null);
+      if (!firstEntry) return '';
+      const firstOfMonth = week.find((entry) =>
+        entry !== null && new Date(`${entry.date}T00:00:00`).getDate() === 1,
+      );
+      const labelDate = firstOfMonth ?? firstEntry;
+      const date = new Date(`${labelDate.date}T00:00:00`);
+      const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+      if (monthKey === previousMonth) return '';
+      previousMonth = monthKey;
+      return date.toLocaleDateString('en-PH', { month: 'short' });
+    });
+  }, [calendarWeeks]);
+  const heatmapColumnGap = 4;
+  const heatmapDotSize = Math.max(
+    10,
+    Math.min(
+      13,
+      Math.floor(
+        (screenWidth - Spacing.md * 4 - 24 - heatmapColumnGap * Math.max(calendarWeeks.length - 1, 0)) /
+          Math.max(calendarWeeks.length, 1),
+      ),
+    ),
+  );
 
   const nextMilestone = getNextMilestone(streakInfo.currentStreak);
   const prevMilestone = STREAK_MILESTONES.slice().reverse().find(m => m.days <= streakInfo.currentStreak);
@@ -540,12 +529,6 @@ function StreakHeroCard({
     (streakInfo.currentStreak - milestoneFrom) / Math.max(milestoneTo - milestoneFrom, 1),
     1,
   );
-
-  // Calendar rows (7 cells each)
-  const weeks: (any | null)[][] = [];
-  for (let i = 0; i < calendarGrid.length; i += 7) {
-    weeks.push(calendarGrid.slice(i, i + 7));
-  }
 
   const levelSubtitle: Record<string, string> = {
     Spark:   streakInfo.currentStreak > 0 ? 'You\'ve started! Keep the spark alive ✨' : 'Log your first meal to start!',
@@ -573,99 +556,113 @@ function StreakHeroCard({
         </View>
       </View>
 
-      {/* Calendar section */}
+      {/* 90-day contribution heatmap */}
       <View style={styles.streakCalSection}>
-        {/* Month navigation */}
         <View style={styles.streakCalNav}>
-          <Text style={styles.streakCalMonth}>{calMonthLabel}</Text>
-          <View style={styles.streakCalNavBtns}>
-            <Pressable onPress={onPrevMonth} style={({pressed}) => [styles.streakNavBtn, pressed && {opacity: 0.7}]}>
-              <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
-            </Pressable>
-            <Pressable
-              onPress={onNextMonth}
-              style={({pressed}) => [styles.streakNavBtn, isCurrentMonth && styles.streakNavBtnDisabled, pressed && {opacity: 0.7}]}
-              disabled={isCurrentMonth}
-            >
-              <Ionicons name="chevron-forward" size={18}
-                color={isCurrentMonth ? colors.textMuted : colors.textSecondary} />
-            </Pressable>
-          </View>
+          <Text style={styles.streakCalMonth}>Last 90 days</Text>
         </View>
 
-        {/* Day-of-week headers */}
-        <View style={styles.streakDowRow}>
-          {DAY_HEADERS.map(h => (
-            <Text key={h} style={styles.streakDowLabel}>{h}</Text>
-          ))}
-        </View>
+        {calendarWeeks.length > 0 ? (
+          <View style={styles.streakHeatmap}>
+            <View style={[styles.streakHeatmapRow, { gap: heatmapColumnGap }]}>
+              <View style={styles.streakHeatmapWeekdaySpacer} />
+              <View style={[styles.streakHeatmapDots, { gap: heatmapColumnGap }]}>
+                {monthLabels.map((month, index) => (
+                  <View key={index} style={{ width: heatmapDotSize, overflow: 'visible' }}>
+                    {month ? (
+                      <Text numberOfLines={1} style={[styles.streakHeatmapMonthLabel, { width: 36 }]}>
+                        {month}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            </View>
 
-        {/* Calendar rows */}
-        {weeks.map((week, wIdx) => {
-          // Per-cell streak membership for inline pill rendering
-          const inRun = week.map((c) => {
-            if (!c) return false;
-            const f = c.date > todayStr;
-            return !f && c.quality >= 1;
-          });
+            {DAY_HEADERS.map((day, dayIndex) => (
+              <View key={`${day}-${dayIndex}`} style={[styles.streakHeatmapRow, { gap: heatmapColumnGap }]}>
+                <Text style={styles.streakHeatmapWeekdayLabel}>{day}</Text>
+                <View style={[styles.streakHeatmapDots, { gap: heatmapColumnGap }]}>
+                  {calendarWeeks.map((week, weekIndex) => {
+                    const entry = week[dayIndex];
+                    if (!entry) {
+                      return (
+                        <View
+                          key={`empty-${weekIndex}-${dayIndex}`}
+                          style={[styles.streakHeatmapCell, { width: heatmapDotSize, height: heatmapDotSize, borderRadius: heatmapDotSize / 2, backgroundColor: 'transparent', borderColor: 'transparent' }]}
+                        />
+                      );
+                    }
 
-          return (
-            <View key={wIdx} style={styles.streakWeekRow}>
-              {week.map((cell, cIdx) => {
-                if (!cell) return <View key={cIdx} style={styles.streakDayEmpty} />;
-                const isToday = cell.date === todayStr;
-                const isFuture = cell.date > todayStr;
-                const dotColor = getQualityColor(cell.quality);
-                const dayNum = parseInt(cell.date.split('-')[2], 10);
+                    const isToday = entry.date === todayStr;
+                    const isFuture = entry.date > todayStr;
+                    const fillColor = entry.quality === 3
+                      ? colors.primary
+                      : entry.quality === 2
+                        ? colors.calories
+                        : entry.quality === 1
+                          ? colors.protein
+                          : colors.bgElevated;
+                    const date = new Date(`${entry.date}T00:00:00`);
+                    const dateLabel = date.toLocaleDateString('en-PH', {
+                      weekday: 'long', month: 'long', day: 'numeric',
+                    });
+                    const statusLabel = isToday && entry.quality === 0
+                      ? 'No meal logged yet'
+                      : DAY_QUALITY_LABELS[entry.quality];
 
-                // Streak connector: determine rounded edges at run boundaries
-                const cellInRun = inRun[cIdx];
-                const prevInRun = cIdx > 0 && inRun[cIdx - 1];
-                const nextInRun = cIdx < 6 && inRun[cIdx + 1];
-                const isRunStart = cellInRun && !prevInRun;
-                const isRunEnd   = cellInRun && !nextInRun;
-
-                return (
-                  <View key={cell.date} style={styles.streakDayCellOuter}>
-                    {/* Per-cell streak connector background */}
-                    {cellInRun && (
+                    return (
                       <View
+                        key={entry.date}
+                        accessible
+                        accessibilityRole="image"
+                        accessibilityLabel={`${dateLabel}: ${statusLabel}`}
                         style={[
-                          styles.streakCellBg,
-                          isRunStart && { borderTopLeftRadius: 18, borderBottomLeftRadius: 18 },
-                          isRunEnd && { borderTopRightRadius: 18, borderBottomRightRadius: 18 },
+                          styles.streakHeatmapCell,
+                          {
+                            width: heatmapDotSize,
+                            height: heatmapDotSize,
+                            borderRadius: heatmapDotSize / 2,
+                            backgroundColor: fillColor,
+                            borderColor: isToday ? colors.accent : colors.borderLight,
+                            borderWidth: isToday ? 2 : entry.quality === 0 ? 1 : 0,
+                            opacity: isFuture ? 0.4 : 1,
+                          },
                         ]}
                       />
-                    )}
-                    <View
-                      style={[
-                        styles.streakDayCell,
-                        isToday && { borderWidth: 2, borderColor: colors.primary },
-                      ]}
-                    >
-                      {!isFuture && cell.quality > 0 ? (
-                        <View style={[styles.streakDayFill, { backgroundColor: dotColor }]}>
-                          <Text style={styles.streakDayNumFilled}>{dayNum}</Text>
-                          {cell.quality >= 2 && (
-                            <Text style={styles.streakDayEmoji}>
-                              {cell.quality === 3 ? '🔥' : '🟠'}
-                            </Text>
-                          )}
-                        </View>
-                      ) : (
-                        <Text style={[
-                          styles.streakDayNumEmpty,
-                          isFuture && { color: colors.textMuted },
-                          isToday && { color: colors.primary, fontWeight: FontWeight.bold },
-                        ]}>{dayNum}</Text>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.streakHeatmapEmpty}>Meal activity will appear here.</Text>
+        )}
+
+        <View style={styles.streakTodaySummary}>
+          <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+          <Text style={styles.streakTodaySummaryText}>Today · {todayStatus}</Text>
+        </View>
+
+        {/* Quality legend */}
+        <View style={styles.streakLegendRow}>
+          {[
+            { color: colors.bgElevated, label: 'No meal', border: true },
+            { color: colors.protein, label: 'Logged' },
+            { color: colors.calories, label: 'Close' },
+            { color: colors.primary, label: 'On target' },
+          ].map(item => (
+            <View key={item.label} style={styles.streakLegendItem}>
+              <View style={[
+                styles.streakLegendDot,
+                { backgroundColor: item.color },
+                item.border && { borderWidth: 1, borderColor: colors.border },
+              ]} />
+              <Text style={styles.streakLegendLabel}>{item.label}</Text>
             </View>
-          );
-        })}
+          ))}
+        </View>
 
         {/* Stats row */}
         <View style={styles.streakStatsRow}>
@@ -703,24 +700,6 @@ function StreakHeroCard({
           </View>
         )}
 
-        {/* Legend */}
-        <View style={styles.streakLegendRow}>
-          {[
-            { color: '#D94A1E', label: 'Perfect' },
-            { color: '#E8A254', label: 'Close'   },
-            { color: '#F4C97A', label: 'Logged'  },
-            { color: 'transparent', label: 'Missed', border: true },
-          ].map(item => (
-            <View key={item.label} style={styles.streakLegendItem}>
-              <View style={[
-                styles.streakLegendDot,
-                { backgroundColor: item.color },
-                item.border && { borderWidth: 1.5, borderColor: colors.border },
-              ]} />
-              <Text style={styles.streakLegendLabel}>{item.label}</Text>
-            </View>
-          ))}
-        </View>
       </View>
     </View>
   );
@@ -1006,7 +985,7 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  // Calendar
+  // Contribution heatmap
   streakCalSection: {
     padding: Spacing.md,
     gap: Spacing.sm,
@@ -1021,83 +1000,57 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: FontWeight.bold,
     color: colors.textPrimary,
   },
-  streakCalNavBtns: {
-    flexDirection: 'row',
+  streakHeatmap: {
+    alignSelf: 'center',
     gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
   },
-  streakNavBtn: {
-    padding: 6,
-    borderRadius: Radius.sm,
-    backgroundColor: colors.bgElevated,
-  },
-  streakNavBtnDisabled: {
-    opacity: 0.35,
-  },
-  streakDowRow: {
+  streakHeatmapRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 2,
+    alignItems: 'center',
   },
-  streakDowLabel: {
-    width: 36,
-    textAlign: 'center',
+  streakHeatmapWeekdaySpacer: {
+    width: 20,
+  },
+  streakHeatmapWeekdayLabel: {
+    width: 20,
+    fontSize: FontSize.xs,
+    lineHeight: 14,
+    color: colors.textMuted,
+    fontWeight: FontWeight.medium,
+  },
+  streakHeatmapDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  streakHeatmapMonthLabel: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,
-    color: colors.textMuted,
-  },
-  streakWeekRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 2,
-  },
-  streakDayCellOuter: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 40,
-  },
-  streakCellBg: {
-    position: 'absolute',
-    top: 2,
-    bottom: 2,
-    left: 0,
-    right: 0,
-    backgroundColor: '#D94A1E16',
-    borderRadius: 0,
-  },
-  streakDayEmpty: {
-    flex: 1,
-    height: 40,
-  },
-  streakDayCell: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  streakDayFill: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  streakDayNumFilled: {
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: '#fff',
-    lineHeight: 13,
-  },
-  streakDayEmoji: {
-    fontSize: 10,
-    lineHeight: 12,
-  },
-  streakDayNumEmpty: {
-    fontSize: 13,
+    lineHeight: 14,
     color: colors.textSecondary,
-    fontWeight: FontWeight.medium,
+  },
+  streakHeatmapCell: {
+    borderWidth: 1,
+  },
+  streakHeatmapEmpty: {
+    fontSize: FontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: Spacing.md,
+  },
+  streakTodaySummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: colors.bgElevated,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  streakTodaySummaryText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: colors.textPrimary,
   },
   // Stats row
   streakStatsRow: {
@@ -1165,7 +1118,7 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   streakLegendRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: Spacing.md,
+    gap: Spacing.sm,
     marginTop: Spacing.xs,
     flexWrap: 'wrap',
   },
@@ -1181,7 +1134,7 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   streakLegendLabel: {
     fontSize: FontSize.xs,
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontWeight: FontWeight.medium,
   },
   emptyMeals: {

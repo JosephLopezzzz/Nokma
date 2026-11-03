@@ -131,6 +131,18 @@ Soft, tactile rounding. Smallest interactive elements use 8px (`sm`), standard c
 - **Depth:** No borders, heavy `Hero Lift` shadow.
 - **Internal:** Highly saturated backgrounds (often gradients mapped to streak level) with white, drop-shadowed text.
 
+### Coach Hoo Chathead
+- **Shape:** 64dp circular launcher with a 2dp `colors.primary` ring and a warm cream `#FAF6EE` surface.
+- **Mascot:** Use the transparent `mobile/assets/mascot/idle-dashboard.webp` artwork so the launcher matches the dashboard mascot's colors.
+- **Chat messages:** Reuse the same transparent dashboard artwork as a free-standing coach avatar with no badge fill or border.
+- **Interaction:** Hover and press shift the inner surface to `#F5EBE0`; the launcher keeps a fixed circular frame with no scale change.
+- **Shared source:** The dashboard, launcher, and chat messages use one mascot asset for consistent color and rendering.
+
+### 90-Day Streak Heatmap
+- **Layout:** Arrange the latest 90 `StreakDayEntry` values in Sunday-first weekly columns with circular day cells and month markers.
+- **Quality colors:** No meal uses `colors.bgElevated`; Logged uses `colors.protein`; Close to goal uses `colors.calories`; On target uses `colors.primary`.
+- **Selection:** Mark today with a `colors.accent` ring; keep the current streak start date and best streak summaries sourced from `StreakInfo`.
+
 ### KPI Cards
 - **Corner Style:** 12px radius (`md`).
 - **Depth:** `Card Rest` shadow, no borders.

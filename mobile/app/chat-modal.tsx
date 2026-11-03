@@ -6,6 +6,7 @@ import {
   Animated, Keyboard, ActivityIndicator, ScrollView, Modal, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMeals } from '../context/MealContext';
@@ -103,7 +104,7 @@ const MessageItem = React.memo(({ item, styles, user }: { item: Message, styles:
     <View style={[styles.msgWrapper, isCoach ? styles.msgCoachWrapper : styles.msgUserWrapper]}>
       {isCoach && (
         <View style={styles.coachAvatarCircle}>
-          <Image source={require('../assets/mascot/chatbot update.png')} style={styles.coachAvatar} resizeMode="cover" />
+          <ExpoImage source={require('../assets/mascot/chatbot-dashboard.png')} style={styles.coachAvatar} contentFit="contain" />
         </View>
       )}
       <View style={[styles.msgBubble, isCoach ? styles.msgBubbleCoach : styles.msgBubbleUser, { flexShrink: 1 }]}>
@@ -175,7 +176,7 @@ const StreamingBubble = forwardRef<StreamingBubbleRef, { styles: any }>((props, 
   return (
     <View style={[props.styles.msgWrapper, props.styles.msgCoachWrapper]}>
       <View style={props.styles.coachAvatarCircle}>
-        <Image source={require('../assets/mascot/chatbot update.png')} style={props.styles.coachAvatar} resizeMode="cover" />
+        <ExpoImage source={require('../assets/mascot/chatbot-dashboard.png')} style={props.styles.coachAvatar} contentFit="contain" />
       </View>
       <View style={[props.styles.msgBubble, props.styles.msgBubbleCoach, { flexShrink: 1 }]}>
         <Text style={[props.styles.msgText, props.styles.msgTextCoach]}>
@@ -1182,19 +1183,15 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: 8,
   },
   coachAvatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   coachAvatar: {
-    width: '100%',
-    height: '100%',
+    width: 56,
+    height: 56,
   },
   userAvatarCircle: {
     width: 36,

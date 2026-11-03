@@ -28,10 +28,12 @@ function CoachGuide({ message, visible, greeting, date }: CoachGuideProps) {
   return (
     <View style={styles.container}>
       <View style={[styles.mascotFrame, { width: mascotSize, height: mascotSize }]}>
+        {/* Preserve the antialiased contour at the dashboard's small size. */}
         <Image
-          source={require('../assets/mascot/idle.gif')}
+          source={require('../assets/mascot/idle-dashboard.webp')}
           style={{ width: mascotSize, height: mascotSize }}
           contentFit="contain"
+          allowDownscaling={false}
           priority="low"
           cachePolicy="memory-disk"
         />
