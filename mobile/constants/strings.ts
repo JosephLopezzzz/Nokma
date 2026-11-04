@@ -298,16 +298,20 @@ export const STRINGS = {
   'coach.greeting.evening':   ['Good evening, {name}!', 'Magandang gabi, {name}!'],
   'coach.friend':             ['there', 'kaibigan'],
   'coach.lateNight': [
-    "It's getting late! Great work today. Time to rest and recover.",
-    'Gumagabi na! Magaling ang ginawa mo ngayong araw. Oras na para magpahinga.',
+    "It's getting late, {name}. You did great today. Let's rest and recover.",
+    'Gabi na, {name}. Ang galing mo ngayong araw. Magpahinga na tayo para makabawi ka.',
+  ],
+  'coach.highIntake': [
+    "I noticed today's logs are well above your targets. Want to double-check an entry?",
+    'Napansin kong lampas sa targets mo ngayong araw ang mga na-log. Gusto mo bang tingnan kung tama ang isang tala?',
   ],
   'coach.welcome': [
     "Welcome to Nokma! Tap the + to log your first meal — I'll help track your progress!",
     'Maligayang pagdating sa Nokma! I-tap ang + para i-log ang unang pagkain mo — tutulungan kitang i-track ang progress mo!',
   ],
   'coach.celebration': [
-    'Nailed it! All macros hit today. Nokma is proud of you!',
-    'Nagawa mo! Kumpleto ang macros ngayong araw. Proud sa iyo si Nokma!',
+    "You hit all your macro goals today! I'm proud of you. Great work!",
+    'Naabot mo ang lahat ng macro goals mo ngayon! Proud ako sa iyo. Ang galing!',
   ],
   'coach.almostThere':      ['Almost there! {remainder}. You\'ve got this!', 'Malapit na! {remainder}. Kaya mo yan!'],
   'coach.proteinToGo':      ['{grams}g protein to go', '{grams}g protina na lang'],

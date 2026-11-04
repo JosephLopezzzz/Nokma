@@ -12,6 +12,8 @@ export const COACH_PRIORITY = {
 
 export type CoachPriorityValue = typeof COACH_PRIORITY[keyof typeof COACH_PRIORITY];
 
+export type DashboardCoachExpression = 'idle' | 'flex' | 'worry' | 'sleep';
+
 // ─── Centralized Timing Tokens (Milliseconds) ────────────────────────────────
 export const COACH_TIMING = {
   instant: 120,

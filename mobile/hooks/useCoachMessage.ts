@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import type { Meal, MacroResult, DailyTargets } from '../types';
+import type { DashboardCoachExpression } from '../constants/coachAnimation';
 import type { Language } from '../services/coachMessageService';
 import { t } from '../constants/i18n';
 import type { StringKey } from '../constants/i18n';
@@ -9,19 +11,33 @@ export type CoachMessageType =
   | 'progress'
   | 'celebration'
   | 'late-night'
+  | 'warning'
   | 'confirmation';
 
 export interface CoachMessageResult {
   greeting: string;
   message: string;
   messageType: CoachMessageType;
+  expression: DashboardCoachExpression;
 }
 
-function getGreetingKey(): StringKey {
-  const h = new Date().getHours();
-  if (h < 12) return 'coach.greeting.morning';
-  if (h < 17) return 'coach.greeting.afternoon';
+function getGreetingKey(hour: number): StringKey {
+  if (hour < 12) return 'coach.greeting.morning';
+  if (hour < 17) return 'coach.greeting.afternoon';
   return 'coach.greeting.evening';
+}
+
+function isWellAboveDailyTarget(value: number, target: number): boolean {
+  return target > 0 && Number.isFinite(value) && value >= target * 1.25;
+}
+
+function isWellAboveAnyDailyTarget(totals: MacroResult, targets: DailyTargets): boolean {
+  return (
+    isWellAboveDailyTarget(totals.calories, targets.calories_target) ||
+    isWellAboveDailyTarget(totals.protein, targets.protein_target) ||
+    isWellAboveDailyTarget(totals.carbs, targets.carbs_target) ||
+    isWellAboveDailyTarget(totals.fat, targets.fat_target)
+  );
 }
 
 export function useCoachMessage(
@@ -32,16 +48,40 @@ export function useCoachMessage(
   lang: Language = 'english',
   currentStreak: number = 0,
 ): CoachMessageResult {
+  const [hour, setHour] = useState(() => new Date().getHours());
+  useEffect(() => {
+    const timer = setInterval(() => setHour(new Date().getHours()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const name = userName?.split(' ')[0] || t(lang, 'coach.friend');
-  const hour = new Date().getHours();
   const isLate = hour >= 22 || hour < 5;
-  const greeting = t(lang, getGreetingKey(), { name });
+  const greeting = t(lang, getGreetingKey(hour), { name });
 
   if (isLate) {
     return {
       greeting,
-      message: t(lang, 'coach.lateNight'),
+      message: t(lang, 'coach.lateNight', { name }),
       messageType: 'late-night',
+      expression: 'sleep',
+    };
+  }
+
+  if (!meals || meals.length === 0) {
+    return {
+      greeting,
+      message: t(lang, 'coach.welcome'),
+      messageType: 'welcome',
+      expression: 'idle',
+    };
+  }
+
+  if (targets && isWellAboveAnyDailyTarget(totals, targets)) {
+    return {
+      greeting,
+      message: t(lang, 'coach.highIntake'),
+      messageType: 'warning',
+      expression: 'worry',
     };
   }
 
@@ -60,16 +100,9 @@ export function useCoachMessage(
         greeting,
         message: streakMessages[hit],
         messageType: 'celebration',
+        expression: 'idle',
       };
     }
-  }
-
-  if (!meals || meals.length === 0) {
-    return {
-      greeting,
-      message: t(lang, 'coach.welcome'),
-      messageType: 'welcome',
-    };
   }
 
   if (targets) {
@@ -82,11 +115,17 @@ export function useCoachMessage(
     );
     const mealCount = meals.length;
 
-    if (calPct >= 1) {
+    const macroTargetsMet =
+      targets.protein_target > 0 && totals.protein >= targets.protein_target &&
+      targets.carbs_target > 0 && totals.carbs >= targets.carbs_target &&
+      targets.fat_target > 0 && totals.fat >= targets.fat_target;
+
+    if (macroTargetsMet && calPct >= 0.9) {
       return {
         greeting,
         message: t(lang, 'coach.celebration'),
         messageType: 'celebration',
+        expression: 'flex',
       };
     }
 
@@ -99,6 +138,7 @@ export function useCoachMessage(
         greeting,
         message: t(lang, 'coach.almostThere', { remainder }),
         messageType: 'progress',
+        expression: 'idle',
       };
     }
 
@@ -111,6 +151,7 @@ export function useCoachMessage(
           { count: mealCount },
         ),
         messageType: 'encouragement',
+        expression: 'idle',
       };
     }
 
@@ -119,6 +160,7 @@ export function useCoachMessage(
         greeting,
         message: t(lang, 'coach.greatStart', { count: mealCount }),
         messageType: 'encouragement',
+        expression: 'idle',
       };
     }
 
@@ -126,6 +168,7 @@ export function useCoachMessage(
       greeting,
       message: t(lang, 'coach.offToGoodStart'),
       messageType: 'encouragement',
+      expression: 'idle',
     };
   }
 
@@ -133,5 +176,6 @@ export function useCoachMessage(
     greeting,
     message: t(lang, 'coach.startLogging'),
     messageType: 'welcome',
+    expression: 'idle',
   };
 }

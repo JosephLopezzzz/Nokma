@@ -180,7 +180,9 @@ export default function DashboardScreen() {
     })();
   }, []);
 
-  const displayMessage = confirmationMsg ?? coach.message;
+  const displayMessage = coach.expression === 'idle'
+    ? confirmationMsg ?? coach.message
+    : coach.message;
 
   const caloriesTarget = targets?.calories_target ?? 2000;
   const proteinTarget = targets?.protein_target ?? 150;
@@ -236,6 +238,7 @@ export default function DashboardScreen() {
                 <CoachGuide
                   message={displayMessage}
                   visible
+                  expression={coach.expression}
                   greeting={`${coach.greeting.replace(/,.*$/, '')}, ${firstName}!`}
                   date={today}
                 />
